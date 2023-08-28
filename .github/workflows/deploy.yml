@@ -7,13 +7,3 @@ jobs:
     runs-on: self-hosted
     steps:
     - uses: actions/checkout@v1
-
-    - name: 'Deploy'
-      uses: 'deliverybot/helm@v1'
-      with:
-        release: 'nginx'
-        namespace: 'default'
-        chart: 'app'
-        token: '${{ github.token }}'
-        values: |
-          name: foobar
