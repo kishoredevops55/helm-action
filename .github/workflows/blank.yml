@@ -28,3 +28,6 @@ jobs:
       # Runs helm repo list
       - name: Helm repo List
         run: helm repo list
+      # Runs helm version
+      - name: Helm version check
+        run: helm version
