@@ -1,9 +1,0 @@
-# .github/workflows/deploy.yml
-name: Deploy
-on: ['deployment']
-
-jobs:
-  deployment:
-    runs-on: self-hosted
-    steps:
-    - uses: actions/checkout@v1
