@@ -28,3 +28,6 @@ jobs:
       # Runs docker hello-world
       - name: file and process
         run: ls && ps
+      # Runs docker hello-world
+      - name: docker prune process
+        run: docker system prune -a -f
