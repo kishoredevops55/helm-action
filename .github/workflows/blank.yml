@@ -11,7 +11,7 @@ jobs:
   # This workflow contains a single job called "build"
   build:
     # The type of runner that the job will run on
-    runs-on: kishore-linux
+    runs-on: sai-win
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -25,9 +25,12 @@ jobs:
       # Runs docker hello-world
       - name: Hello from Docker
         run: docker run hello-world
+      # Display Docker images
+      - name: Hello from Docker
+        run: docker images
       # Runs docker hello-world
       - name: file and process
-        run: ls && ps
+        run: dir
       # Runs docker hello-world
       - name: docker prune process
         run: docker system prune -a -f
