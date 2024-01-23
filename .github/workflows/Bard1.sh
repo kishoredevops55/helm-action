@@ -1,26 +1,19 @@
 #!/bin/bash
 
-# Replace with your Azure Key Vault name
-keyvault_name="your-keyvault-name"
+# Your Azure Key Vault name
+keyVaultName="your-keyvault-name"
 
-# Enable verbose output to capture hidden values
-export AZURE_CLI_DEBUG=true
+# Get the list of secret names
+secretNames=$(az keyvault secret list --vault-name $keyVaultName --query "[].name" -o tsv)
 
-# Get raw data with names and string-casted values
-raw_output=$(az keyvault secret list --vault-name $keyvault_name --query "[].{name:name,value:value.tostring}" -o tsv)
+# Create or clear the output file
+outputFile="secrets_output.txt"
+echo -n > "$outputFile"
 
-# Clear debug flag after data retrieval
-unset AZURE_CLI_DEBUG
+# Loop through secret names and get values
+for secretName in $secretNames; do
+    secretValue=$(az keyvault secret show --vault-name $keyVaultName --name "$secretName" --query 'value' -o tsv)
+    echo -e "$secretName\t$secretValue" >> "$outputFile"
+done
 
-# Ensure output isn't empty
-if [[ -z "$raw_output" ]]; then
-  echo "Error: Could not retrieve secrets from Key Vault."
-  exit 1
-fi
-
-# Extract and store secrets
-while IFS= read -r name value; do
-  echo "$name: $value" >> secrets.txt
-done <<< "$raw_output"
-
-echo "Secret names and values stored in secrets.txt"
+echo "Secrets exported to $outputFile"
