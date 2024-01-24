@@ -1,0 +1,8 @@
+az network private-endpoint-connection show --id $(az storage account show --name <storage-account-name> --resource-group <resource-group-name> --query id --output tsv)
+
+
+az network private-endpoint-connection list --resource-group <resource-group-name> --query "[?contains(privateLinkServiceConnections[?privateLinkServiceConnectionState.status == 'Approved'].privateLinkServiceConnectionState.status, 'Approved')]" --output table
+
+az storage account list --resource-group <resource-group-name> --query "[].name" --output table
+
+az storage account list --query "[].name" --output table
