@@ -1,0 +1,27 @@
+spec:
+  serviceName: "example-service"
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: example-app
+    spec:
+      containers:
+      - name: example-container
+        image: nginx:latest
+        volumeMounts:
+{{- range $key, $item := .Values.volumes }}
+        - name: config-volume-{{ $key }};mountPath: {{ $item.path }}
+{{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi
+  volumes:
+{{- range $key, $item := .Values.volumes }}
+  - name: config-volume-{{ $key }};configMap: name: {{ $item.configMap.name }};items: - key: {{ $item.configMap.items.key }};path: {{ $item.configMap.items.path }}
+{{- end }}
