@@ -1,0 +1,7 @@
+volumes:
+  - name: {{ .Values.volumes.name }}
+    configMap:
+      name: {{ .Values.volumes.configMap.name }}
+      items:
+        - key: {{ .Values.volumes.configMap.items.key }}
+          path: {{ .Values.volumes.configMap.items.path }}
