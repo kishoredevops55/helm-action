@@ -1,0 +1,9 @@
+volumes:
+{{- range $key, $value := .Values.volumes }}
+  - name: {{ $value.name }}
+    configMap:
+      name: {{ $value.configMap.name }}
+      items:
+        - key: {{ $value.configMap.items.key }}
+          path: {{ $value.configMap.items.path }}
+{{- end }}
