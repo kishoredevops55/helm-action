@@ -19,7 +19,7 @@ The new PVC retention policy offers flexibility with two key settings: `whenScal
 ## Diagram
 Below is a visual representation of the StatefulSet PVC retention policy matrix:
 
-![PVC Retention Policy Diagram](https://user-images.githubusercontent.com/example/diagram.png)
+![PVC Retention Policy Diagram](https://raw.githubusercontent.com/kishoredevops55/helm-action/main/fwYKM.png)
 
 ## Cost Savings
 Automating the deletion of unused PVCs can result in significant cost savings:
