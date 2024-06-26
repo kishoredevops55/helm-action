@@ -1,0 +1,36 @@
+graph TD
+    A[ACR Tags Reduction and Vulnerability Analysis Workflow]
+
+    A --> B[ACR Tags Reduction]
+    B --> B1[Active Development Approach]
+    B --> B2[Non-Active Development Approach]
+
+    A --> C[Production Release Tag Checkpoint]
+    C --> C1[DevOps Production Checklist]
+    C --> C2[CI Workflow Control]
+
+    A --> D[Python Script for Vulnerability Analysis]
+    D --> D1[Analyze Prisma Report]
+    D --> D2[Read Data from Excel File]
+
+    A --> E[Data Filtration]
+    E --> E1[Filter Data for 'ESOB']
+    E --> E2[Filter Data for 'ESOBF']
+
+    A --> F[Tagging]
+    F --> F1[Use 'np' Tags for Non-Production]
+    F --> F2[Use 'rel' Tags for Production]
+    F --> F3[Count and Compare Tags with Reported Issues]
+
+    A --> G[Weekly Calls]
+    G --> G1[Discuss Progress and Issues]
+    G --> G2[Include POD PMs in Monthly Calls]
+
+    %% Align nodes horizontally
+    B1 -->| | B2
+    C1 -->| | C2
+    D1 -->| | D2
+    E1 -->| | E2
+    F1 -->| | F2 -->| | F3
+    G1 -->| | G2
+      
