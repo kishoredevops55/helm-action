@@ -8,3 +8,7 @@ sum(kube_pod_spec_volumes_persistentvolumeclaims_info) by (namespace, persistent
 (sum(kube_persistentvolumeclaim_info) by (namespace, persistentvolumeclaim))
   - on(namespace, persistentvolumeclaim)
 (sum(kube_pod_spec_volumes_persistentvolumeclaims_info) by (namespace, persistentvolumeclaim) > 0)
+
+
+
+kube_persistentvolumeclaim_info unless (kube_pod_info * on(namespace, pod, cluster) group_left(persistentvolumeclaim, cluster) kube_pod_spec_volumes_persistentvolumeclaims_info)
