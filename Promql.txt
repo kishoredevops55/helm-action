@@ -1,0 +1,10 @@
+# List all PVCs
+sum(kube_persistentvolumeclaim_info) by (namespace, persistentvolumeclaim)
+
+# List PVCs currently used by pods
+sum(kube_pod_spec_volumes_persistentvolumeclaims_info) by (namespace, persistentvolumeclaim)
+
+# Unattached PVCs
+(sum(kube_persistentvolumeclaim_info) by (namespace, persistentvolumeclaim))
+  - on(namespace, persistentvolumeclaim)
+(sum(kube_pod_spec_volumes_persistentvolumeclaims_info) by (namespace, persistentvolumeclaim) > 0)
