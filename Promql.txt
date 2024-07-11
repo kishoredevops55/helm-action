@@ -12,3 +12,7 @@ sum(kube_pod_spec_volumes_persistentvolumeclaims_info) by (namespace, persistent
 
 
 kube_persistentvolumeclaim_info unless (kube_pod_info * on(namespace, pod, cluster) group_left(persistentvolumeclaim, cluster) kube_pod_spec_volumes_persistentvolumeclaims_info)
+
+
+kube_persistentvolumeclaim_status_phase{phase="Bound"} unless on(namespace, persistentvolumeclaim)
+(kube_pod_info * on(namespace, pod) group_left(persistentvolumeclaim) kube_pod_spec_volumes_persistentvolumeclaims_info)
