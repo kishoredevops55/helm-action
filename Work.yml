@@ -1,0 +1,147 @@
+name: unattached-pvc-check-list
+
+on:
+  workflow_call:
+    inputs:
+      NAMESPACEFILE:
+        required: true
+        type: string
+      PLATFORMFILE:
+        required: true
+        type: string
+      INGESTIONFILE:
+        required: true
+        type: string
+      SUPPORTFILE:
+        required: true
+        type: string
+    secrets:
+      KUBECONFIG:
+        required: true
+      PERSONAL_ACCESS_TOKEN:
+        required: true
+
+env:
+  NAMESPACEFILE: ${{ inputs.NAMESPACEFILE }}
+  PLATFORMFILE: ${{ inputs.PLATFORMFILE }}
+  INGESTIONFILE: ${{ inputs.INGESTIONFILE }}
+  SUPPORTFILE: ${{ inputs.SUPPORTFILE }}
+  REPOSITORY: ${{ github.repository }}
+
+jobs:
+  check-unattached-pvc-and-notify:
+    runs-on: ubuntu-latest
+    outputs:
+      cluster_name: ${{ steps.store_cluster.outputs.cluster_name }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Read namespace list file
+      id: namespace
+      run: echo "NAMESPACE=$(cat ${{ env.NAMESPACEFILE }} | tr '\n' ' ')" >> $GITHUB_ENV
+
+    - name: Set K8s-context
+      uses: kishore5/esh-actions-k8scontext@v3
+      with:
+        kubeconfig: ${{ secrets.KUBECONFIG }}
+
+    - name: Checkout central workflow
+      uses: actions/checkout@v4
+      with:
+        repository: kishore5/esh-central-workflow-aut
+        ref: EOP-9986
+        token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+    - name: Store cluster name
+      id: store_cluster
+      run: |
+        echo "Current context: $(kubectl config current-context)"
+        cluster_name=$(kubectl config current-context | sed 's/-admin//')
+        current_date=$(date +%d-%m-%Y)
+        echo "CLUSTER_NAME=$cluster_name" >> $GITHUB_ENV
+        echo "cluster_name=$cluster_name-$current_date" >> $GITHUB_OUTPUT
+        echo "$cluster_name" > cluster.txt
+        echo "$current_date" > time.txt
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install tabulate pandas openpyxl
+
+    - name: Check Unattached PVCs and Pods
+      id: check_pvcs_pods
+      run: |
+        python ./scripts/pvc-check.py "${{ env.NAMESPACE }}" "${{ env.PLATFORMFILE }}" "${{ env.INGESTIONFILE }}" "${{ env.SUPPORTFILE }}"
+        echo "UNATTACHED_PVCS_FOUND=$(cat unattached_pvcs_found.txt)" >> $GITHUB_ENV
+
+    - name: Upload output and env vars as artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: script-output
+        path: |
+          ${{ github.workspace }}/${{ steps.store_cluster.outputs.cluster_name }}.xlsx
+          cluster.txt
+          time.txt
+          unattached_pvcs_found.txt
+
+    - name: Clean Workspace
+      if: always()
+      uses: kishore5/esh-workspace-clean@v2-bash
+
+    - name: Printing Workspace Cleaned Message
+      if: always()
+      run: echo "Workspace cleared for run ID ${{ github.run_number }}"
+
+  needs: check-unattached-pvc-and-notify
+  if: success()
+  name: Mail Attachment
+  runs-on: ubuntu-latest
+  steps:
+  - name: Download Artifact
+    uses: actions/download-artifact@v3
+    with:
+      name: script-output
+      path: ${{ github.workspace }}
+
+  - name: Set env vars from files
+    run: |
+      echo "CLUSTER=$(cat cluster.txt)" >> $GITHUB_ENV
+      echo "UNATTACHED_PVCS_FOUND=$(cat unattached_pvcs_found.txt)" >> $GITHUB_ENV
+      echo "CURRENT_TIME=$(cat time.txt)" >> $GITHUB_ENV
+      echo "ATTACHMENT_FILE=${{ needs.check-unattached-pvc-and-notify.outputs.cluster_name }}.xlsx" >> $GITHUB_ENV
+
+  - name: Check File
+    run: ls -l $PWD
+
+  - name: action-send-mail-template
+    uses: actions/checkout@v4
+    with:
+      repository: kishore5/esh-action-mail
+      ref: master
+      token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      path: ./.github/kishore/action-send-mail
+
+  - name: action-send-mail
+    if: env.UNATTACHED_PVCS_FOUND == 'true'
+    uses: ./.github/kishore5/action-send-mail
+    with:
+      server_address: mailrouter.example.com
+      server_port: 25
+      subject: "Alert: Unattached PVCs Detected in Cluster ${{ env.CLUSTER }}"
+      body: |
+        Dear Team,
+        Unattached Persistent Volume Claims (PVCs) have been detected in the cluster ${{ env.CLUSTER }} on ${{ env.CURRENT_TIME }}.
+      to: respectiveteam@example.com
+      from: kishore.sundaram@example.com
+      attachments: ${{ github.workspace }}/${{ env.ATTACHMENT_FILE }}
+
+  - name: Clean Workspace
+    if: always()
+    uses: kishore5/esh-workspace-clean@v2-bash
+
+  - name: Printing Workspace Cleaned Message
+    if: always()
+    run: echo "Workspace cleared for run ID ${{ github.run_number }}"
+    
