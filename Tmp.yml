@@ -1,0 +1,23 @@
+- name: Set env vars from files
+  run: |
+    echo "CLUSTER=$(cat cluster.txt)" >> $GITHUB_ENV
+    echo "UNATTACHED_PVCS_FOUND=$(cat unattached_pvcs_found.txt)" >> $GITHUB_ENV
+    echo "CURRENT_TIME=$(cat time.txt)" >> $GITHUB_ENV
+    echo "ATTACHMENT_FILE=${{ needs.check-unattached-pvc-and-notify.outputs.cluster_name }}.xlsx" >> $GITHUB_ENV
+    echo "EMAIL_RECIPIENTS=$(cat email_recipients.txt)" >> $GITHUB_ENV
+
+- name: action-send-mail
+  if: env.UNATTACHED_PVCS_FOUND == 'true'
+  uses: ./.github/kishore5/action-send-mail
+  with:
+    server_address: mailrouter.example.com
+    server_port: 25
+    subject: "Alert: Unattached PVCs Detected in Cluster ${{ env.CLUSTER }}"
+    body: |
+      Dear Team,
+      Unattached Persistent Volume Claims (PVCs) have been detected in the cluster ${{ env.CLUSTER }} on ${{ env.CURRENT_TIME }}.
+      Please find the attached report for detailed information.
+    from: DevOps-Admin@example.com
+    to: ${{ env.EMAIL_RECIPIENTS }}
+    content_type: text/plain
+    attachment: ${{ env.ATTACHMENT_FILE }}
