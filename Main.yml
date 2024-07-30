@@ -1,0 +1,19 @@
+name: check-unattached-pvcs
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 5 * * *'
+
+jobs:
+  check-unattached-pvcs:
+    uses: ./.github/workflows/unattached-pvc-check-list.yml
+    with:
+      NAMESPACEFILES: "Actionsfile/namespacelist-cluster1,Actionsfile/namespacelist-cluster2"
+      PLATFORMFILE: "Actionsfile/platform-app-name-list"
+      INGESTIONFILE: "Actionsfile/ingestion-app-name-list"
+      SUPPORTFILE: "Actionsfile/support-app-name-list"
+      KUBECONFIGFILES: ${{ secrets.KUBECONFIG_CLUSTER_1 }},${{ secrets.KUBECONFIG_CLUSTER_2 }}
+    secrets:
+      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      
