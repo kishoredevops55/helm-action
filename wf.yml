@@ -1,0 +1,72 @@
+name: unattached-pvc-check-list
+
+on:
+  workflow_call:
+    inputs:
+      NAMESPACEFILE:
+        required: true
+        type: string
+      PLATFORMFILE:
+        required: true
+        type: string
+      INGESTIONFILE:
+        required: true
+        type: string
+      SUPPORTFILE:
+        required: true
+        type: string
+      KUBECONFIGFILES:
+        required: true
+        type: string
+    secrets:
+      PERSONAL_ACCESS_TOKEN:
+        required: true
+
+jobs:
+  check-unattached-pvc-and-notify:
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACEFILE: ${{ inputs.NAMESPACEFILE }}
+      PLATFORMFILE: ${{ inputs.PLATFORMFILE }}
+      INGESTIONFILE: ${{ inputs.INGESTIONFILE }}
+      SUPPORTFILE: ${{ inputs.SUPPORTFILE }}
+      KUBECONFIGFILES: ${{ inputs.KUBECONFIGFILES }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install tabulate pandas openpyxl
+
+      - name: Iterate over kubeconfigs and run PVC check
+        run: |
+          KUBECONFIGFILES=${{ inputs.KUBECONFIGFILES }}
+          IFS=',' read -ra KUBECONFIG_ARRAY <<< "$KUBECONFIGFILES"
+          for kubeconfig in "${KUBECONFIG_ARRAY[@]}"; do
+            echo "Setting Kubernetes context with kubeconfig: $kubeconfig"
+            export KUBECONFIG=$kubeconfig
+            kubectl config use-context $(kubectl config current-context)
+            python ./scripts/pvc-check.py "${{ env.NAMESPACEFILE }}" "${{ env.PLATFORMFILE }}" "${{ env.INGESTIONFILE }}" "${{ env.SUPPORTFILE }}"
+          done
+          echo "UNATTACHED_PVCS_FOUND=$(cat unattached_pvcs_found.txt)" >> $GITHUB_ENV
+
+      - name: Upload output and env vars as artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: script-output
+          path: |
+            unattached_pvcs_report-*.xlsx
+            unattached_pvcs_found.txt
+            email_recipients.txt
+
+      - name: Clean Workspace
+        if: always()
+        uses: Kishore5/workspace-clean@v2-bash
+
+      - name: Printing Workspace Cleaned Message
+        if: always()
+        run: |
+          echo "Workspace cleared for run ID ${{ github.run_number }}"
+
