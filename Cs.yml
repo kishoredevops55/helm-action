@@ -1,0 +1,127 @@
+name: unattached-pvc-check-list
+
+on:
+  workflow_call:
+    inputs:
+      NAMESPACEFILES:
+        required: true
+        type: string
+      PLATFORMFILE:
+        required: true
+        type: string
+      INGESTIONFILE:
+        required: true
+        type: string
+      SUPPORTFILE:
+        required: true
+        type: string
+      KUBECONFIGFILES:
+        required: true
+        type: string
+    secrets:
+      PERSONAL_ACCESS_TOKEN:
+        required: true
+
+jobs:
+  check-unattached-pvc-and-notify:
+    runs-on: ubuntu-latest
+    env:
+      PLATFORMFILE: ${{ inputs.PLATFORMFILE }}
+      INGESTIONFILE: ${{ inputs.INGESTIONFILE }}
+      SUPPORTFILE: ${{ inputs.SUPPORTFILE }}
+      KUBECONFIGFILES: ${{ inputs.KUBECONFIGFILES }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install tabulate pandas openpyxl
+
+      - name: Iterate over kubeconfigs and run PVC check
+        run: |
+          NAMESPACEFILES=${{ inputs.NAMESPACEFILES }}
+          KUBECONFIGFILES=${{ inputs.KUBECONFIGFILES }}
+          IFS=',' read -ra NAMESPACE_ARRAY <<< "$NAMESPACEFILES"
+          IFS=',' read -ra KUBECONFIG_ARRAY <<< "$KUBECONFIGFILES"
+          for index in "${!KUBECONFIG_ARRAY[@]}"; do
+            kubeconfig=${KUBECONFIG_ARRAY[$index]}
+            namespacefile=${NAMESPACE_ARRAY[$index]}
+            echo "Setting Kubernetes context with kubeconfig: $kubeconfig"
+            export KUBECONFIG=$kubeconfig
+            kubectl config use-context $(kubectl config current-context)
+            python ./scripts/pvc-check.py "$namespacefile" "${{ env.PLATFORMFILE }}" "${{ env.INGESTIONFILE }}" "${{ env.SUPPORTFILE }}"
+          done
+          echo "UNATTACHED_PVCS_FOUND=$(cat unattached_pvcs_found.txt)" >> $GITHUB_ENV
+
+      - name: Upload output and env vars as artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: script-output
+          path: |
+            unattached_pvcs_report-*.xlsx
+            unattached_pvcs_found.txt
+            email_recipients.txt
+
+      - name: Clean Workspace
+        if: always()
+        uses: Kishore5/esgh-workspace-clean@v2-bash
+
+      - name: Printing Workspace Cleaned Message
+        if: always()
+        run: |
+          echo "Workspace cleared for run ID ${{ github.run_number }}"
+
+  notify:
+    needs: check-unattached-pvc-and-notify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: script-output
+          path: ${{ github.workspace }}
+
+      - name: Set env vars from files
+        run: |
+          echo "UNATTACHED_PVCS_FOUND=$(cat unattached_pvcs_found.txt)" >> $GITHUB_ENV
+          echo "CURRENT_TIME=$(date +%d-%m-%Y)" >> $GITHUB_ENV
+          echo "ATTACHMENT_FILE=unattached_pvcs_report-$(date +%d-%m-%Y).xlsx" >> $GITHUB_ENV
+          echo "EMAIL_RECIPIENTS=$(cat email_recipients.txt)" >> $GITHUB_ENV
+
+      - name: Check File
+        run: ls -ltr $(pwd)
+
+      - name: action-send-mail-template
+        uses: actions/checkout@v2
+        with:
+          repository: Kishore5/esgh-action-mail
+          ref: master
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          path: ./.github/Kishore/action-send-mail
+
+      - name: action-send-mail
+        if: env.UNATTACHED_PVCS_FOUND == 'true'
+        uses: ./.github/Kishore5/action-send-mail
+        with:
+          server_address: mailrouter.example.com
+          server_port: 25
+          subject: "Alert: Unattached PVCs Detected"
+          body: |
+            Dear Team,
+            Unattached Persistent Volume Claims (PVCs) have been detected in one or more clusters on ${{ env.CURRENT_TIME }}.
+            Please find the attached report for detailed information.
+          from: DevOps-Admin@example.com
+          to: ${{ env.EMAIL_RECIPIENTS }}
+          content_type: text/plain
+          attachment: ${{ env.ATTACHMENT_FILE }}
+
+      - name: Clean Workspace
+        if: always()
+        uses: Kishore5/esgh-workspace-clean@v2-bash
+
+      - name: Printing Workspace Cleaned Message
+        if: always()
+        run: echo "Workspace cleared for run ID ${{ github.run_number }}"
+        
