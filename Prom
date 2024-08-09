@@ -1,0 +1,8 @@
+kube_persistentvolumeclaim_info
+  and on (namespace, persistentvolumeclaim)
+  kube_persistentvolumeclaim_status_phase{phase=~"Pending|Lost"}
+  unless (
+    kube_pod_info
+    and on (namespace, persistentvolumeclaim)
+    kube_pod_container_status_running
+  )
