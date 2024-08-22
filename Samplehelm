@@ -6,3 +6,15 @@ ports:
 {{- end -}}
 
 
+ports:
+{{- $defaultPorts := include "mychart.defaultPorts" . | fromYaml }}
+{{- $valuesPorts := .Values.ports }}
+{{- if or (not $valuesPorts) (eq (len $valuesPorts) 0) }}
+{{- $valuesPorts = $defaultPorts.ports }}
+{{- end }}
+{{- range $valuesPorts }}
+  - name: {{ .name }}
+    number: {{ .number }}
+    type: {{ .type }}
+{{- end }}
+
