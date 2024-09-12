@@ -1,11 +1,34 @@
 # Define the input file path
 $inputFile = "path\to\your\inputfile.csv"  # Replace with your actual file path
 
+# Define output log file path with the current date and time for IST timezone
+$date = (Get-Date).ToUniversalTime().AddHours(5.5).ToString("yyyy-MM-dd_HH-mm-ss")
+$outputLogFile = "UpdateTagsLog_$date.txt"
+
+# Initialize the log file
+Add-Content -Path $outputLogFile -Value "Tag Update Log - $date (IST)`n"
+
 # Import the CSV file
-$data = Import-Csv -Path $inputFile
+try {
+    $data = Import-Csv -Path $inputFile -ErrorAction Stop
+} catch {
+    Write-Host "Error: Unable to read input CSV file. Check the file path and format. Error: $_"
+    Add-Content -Path $outputLogFile -Value "Error: Unable to read input CSV file. Error: $_`n"
+    exit 1  # Exit the script with an error code
+}
 
 # Retrieve all subscriptions for the authenticated account
-$subscriptions = Get-AzSubscription
+try {
+    $subscriptions = Get-AzSubscription -ErrorAction Stop
+} catch {
+    Write-Host "Error: Failed to retrieve Azure subscriptions. Error: $_"
+    Add-Content -Path $outputLogFile -Value "Error: Failed to retrieve Azure subscriptions. Error: $_`n"
+    exit 1
+}
+
+# Define the new tag you want to add/update
+$newTagName = "Tag Name"  # Replace with your desired tag name
+$newTagValue = "Tag Value"  # Replace with your desired tag value
 
 # Iterate over each row in the input data
 foreach ($row in $data) {
@@ -19,7 +42,9 @@ foreach ($row in $data) {
     $subscription = $subscriptions | Where-Object { $_.Name -eq $subscriptionName }
 
     if (-not $subscription) {
-        Write-Host "Subscription '$subscriptionName' not found. Skipping this entry."
+        $message = "Subscription '$subscriptionName' not found. Skipping this entry."
+        Write-Host $message
+        Add-Content -Path $outputLogFile -Value "$message`n"
         continue  # Skip to the next resource if subscription is not found
     }
 
@@ -28,9 +53,13 @@ foreach ($row in $data) {
     # Set the subscription context dynamically for each resource
     try {
         Set-AzContext -SubscriptionId $subscriptionId -ErrorAction Stop
-        Write-Host "Switched to subscription: $subscriptionName ($subscriptionId)"
+        $message = "Switched to subscription: $subscriptionName ($subscriptionId)"
+        Write-Host $message
+        Add-Content -Path $outputLogFile -Value "$message`n"
     } catch {
-        Write-Host "Failed to set context for subscription: $subscriptionName. Error: $_"
+        $message = "Failed to set context for subscription: $subscriptionName. Error: $_"
+        Write-Host $message
+        Add-Content -Path $outputLogFile -Value "$message`n"
         continue  # Skip to the next resource if setting the subscription context fails
     }
 
@@ -42,13 +71,11 @@ foreach ($row in $data) {
         $resource = Get-AzResource -ResourceId $resourceId -ErrorAction Stop
         $existingTags = $resource.Tags
     } catch {
-        Write-Host "Failed to retrieve resource '$resourceName' in resource group '$resourceGroupName'. Error: $_"
+        $message = "Failed to retrieve resource '$resourceName' in resource group '$resourceGroupName'. Error: $_"
+        Write-Host $message
+        Add-Content -Path $outputLogFile -Value "$message`n"
         continue  # Skip to the next resource if resource retrieval fails
     }
-
-    # Define the new tag you want to add/update
-    $newTagName = "Tag Name"  # Replace with your desired tag name
-    $newTagValue = "Tag Value"  # Replace with your desired tag value
 
     # Initialize the tags in the desired format
     $tags = @{}
@@ -64,22 +91,34 @@ foreach ($row in $data) {
     if ($tags.ContainsKey($newTagName)) {
         # If the tag value is different, update it
         if ($tags[$newTagName] -ne $newTagValue) {
-            Write-Host "Updating tag '$newTagName' for resource '$resourceName' in resource group '$resourceGroupName'"
+            $message = "Updating tag '$newTagName' for resource '$resourceName' in resource group '$resourceGroupName'"
+            Write-Host $message
+            Add-Content -Path $outputLogFile -Value "$message`n"
             $tags[$newTagName] = $newTagValue
         } else {
-            Write-Host "Tag '$newTagName' with value '$newTagValue' already exists for resource '$resourceName'. Skipping."
+            $message = "Tag '$newTagName' with value '$newTagValue' already exists for resource '$resourceName'. Skipping."
+            Write-Host $message
+            Add-Content -Path $outputLogFile -Value "$message`n"
         }
     } else {
         # Add the new tag
-        Write-Host "Adding new tag '$newTagName' with value '$newTagValue' for resource '$resourceName' in resource group '$resourceGroupName'"
+        $message = "Adding new tag '$newTagName' with value '$newTagValue' for resource '$resourceName' in resource group '$resourceGroupName'"
+        Write-Host $message
+        Add-Content -Path $outputLogFile -Value "$message`n"
         $tags[$newTagName] = $newTagValue
     }
 
     # Update the tags on the resource
     try {
         Update-AzTag -ResourceId $resourceId -Tag $tags -Operation Merge -ErrorAction Stop
-        Write-Host "Tags updated successfully for resource '$resourceName' in resource group '$resourceGroupName'."
+        $message = "Tags updated successfully for resource '$resourceName' in resource group '$resourceGroupName'."
+        Write-Host $message
+        Add-Content -Path $outputLogFile -Value "$message`n"
     } catch {
-        Write-Host "Error updating tags for resource '$resourceName' in resource group '$resourceGroupName'. Error: $_"
+        $message = "Error updating tags for resource '$resourceName' in resource group '$resourceGroupName'. Error: $_"
+        Write-Host $message
+        Add-Content -Path $outputLogFile -Value "$message`n"
     }
 }
+
+Write-Host "Tag update process completed. Check the log file: $outputLogFile"
