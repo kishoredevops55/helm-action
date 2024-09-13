@@ -27,8 +27,8 @@ try {
 }
 
 # Define the new tag you want to add/update
-$newTagName = "Tag Name"  # Replace with your desired tag name
-$newTagValue = "Tag Value"  # Replace with your desired tag value
+$newTagName = "drtier"  # Replace with your desired tag name
+$newTagValue = "dr1"  # Replace with your desired tag value
 
 # Iterate over each row in the input data
 foreach ($row in $data) {
@@ -87,11 +87,11 @@ foreach ($row in $data) {
         }
     }
 
-    # Check if the tag already exists and update it, or add it if it doesn't exist
+    # Update the tag value if it exists, or add it if it doesn't exist
     if ($tags.ContainsKey($newTagName)) {
         # If the tag value is different, update it
         if ($tags[$newTagName] -ne $newTagValue) {
-            $message = "Updating tag '$newTagName' for resource '$resourceName' in resource group '$resourceGroupName'"
+            $message = "Updating tag '$newTagName' for resource '$resourceName' in resource group '$resourceGroupName' from '${tags[$newTagName]}' to '$newTagValue'"
             Write-Host $message
             Add-Content -Path $outputLogFile -Value "$message`n"
             $tags[$newTagName] = $newTagValue
