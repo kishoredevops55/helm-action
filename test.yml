@@ -9,9 +9,11 @@ parameters:
   storageaccounttype: {{ .Values.storageClass.parameters.storageaccounttype | quote }}
   resourceGroup: {{ .Values.storageClass.parameters.resourceGroup | quote }}
   tags: {{- if .Values.storageClass.parameters.tags }}
+    {{- $tagList := "" }}
     {{- range $key, $value := .Values.storageClass.parameters.tags }}
-      {{ $key }}={{ $value }}{{- if not (eq $key (last (keys .Values.storageClass.parameters.tags))) }},{{ end }}
+      {{- $tagList = printf "%s%s=%s," $tagList $key $value }}
     {{- end }}
+    {{- printf "%s" (trimSuffix "," $tagList) }}
   {{- end }}
 allowVolumeExpansion: {{ .Values.storageClass.allowVolumeExpansion | quote }}
 reclaimPolicy: {{ .Values.storageClass.reclaimPolicy | quote }}
