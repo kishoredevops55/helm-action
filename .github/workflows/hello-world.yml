@@ -1,0 +1,20 @@
+name: Hello World
+
+on:
+  workflow_dispatch:
+    inputs:
+      approve:
+        description: 'Approve to run'
+        required: true
+        default: 'no'
+        type: choice
+        options:
+          - 'yes'
+          - 'no'
+jobs:
+  print_hello:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.approve == 'yes' }}
+    steps:
+      - name: Print Hello World
+        run: echo "Hello, World!"
