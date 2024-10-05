@@ -1,20 +1,16 @@
-name: Hello World
+name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      approve:
-        description: 'Approve to run'
-        required: true
-        default: 'no'
-        type: choice
-        options:
-          - 'yes'
-          - 'no'
+
 jobs:
-  print_hello:
+  approve_and_release:
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.approve == 'yes' }}
+    environment: production  # This specifies the environment that requires approval
+
     steps:
-      - name: Print Hello World
-        run: echo "Hello, World!"
+      - name: Print Approval Message
+        run: echo "Hello, World! This is the release process."
+
+      - name: Notify Release
+        run: echo "Notifying the stakeholders about the released "
