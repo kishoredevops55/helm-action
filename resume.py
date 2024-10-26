@@ -39,7 +39,7 @@ contact_info.alignment = WD_ALIGN_PARAGRAPH.CENTER
 # Professional Summary
 doc_reordered.add_heading('Professional Summary', level=2)
 doc_reordered.add_paragraph(
-    "- Highly skilled SRE and DevOps Engineer with over 7 years of experience in CI/CD automation, software configuration management, and infrastructure management.\n"
+    "- Highly skilled SRE and DevOps Engineer with over around 9 years of experience in CI/CD automation, software configuration management, and infrastructure management.\n"
     "- Expertise in implementing and supporting CI/CD pipelines, build & release management, and automation infrastructure for monitoring.\n"
     "- Proficient in various DevOps and cloud platforms, with a focus on enhancing system reliability and operational efficiency."
 )
