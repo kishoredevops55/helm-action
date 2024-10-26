@@ -129,7 +129,7 @@ doc_reordered.add_heading('Languages', level=2)
 doc_reordered.add_paragraph("Tamil, English")
 
 # Save the reordered resume
-output_path_reordered_docx = "/mnt/data/Kishore_Resume_Final_Reordered.docx"
+output_path_reordered_docx = "Kishore_Resume_Final_Reordered.docx"  # Change this line
 doc_reordered.save(output_path_reordered_docx)
 
 output_path_reordered_docx
