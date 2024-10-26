@@ -1,12 +1,17 @@
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-# Data for reordering
+# Final skill categories, now including all tools from the old resume
 skill_categories = {
     "Programming Languages": ["Python", "Shell Scripting", "Groovy"],
-    "DevOps Tools": ["Jenkins", "GitLab CI", "GitHub Actions", "Docker", "Kubernetes", "Ansible"],
+    "DevOps Tools": ["Jenkins", "GitLab CI", "GitHub Actions", "AutoCM", "Docker", "Kubernetes (Helm 3)", "Helm", "Ansible", "Azure DevOps", "Maven"],
+    "Version Control": ["GIT", "CA Harvest", "Subversion"],
     "Cloud Platforms": ["AWS", "Azure"],
-    "Monitoring": ["Prometheus", "Grafana", "ELK Stack", "Datadog"]
+    "Monitoring & Observability": ["Grafana Enterprise", "Grafana OSS", "Grafana Mimir (Metrics)", "Loki (Logs)", "Tempo (Traces)", "Prometheus", "Grafana Cloud Stack"],
+    "Artifact Management": ["Nexus"],
+    "Atlassian Tools": ["JIRA", "Confluence"],
+    "Ticketing Tools": ["JIRA", "CA Service Desk", "BMC Remedy", "ServiceNow"],
+    "Infrastructure as Code (IaC)": ["Terraform"],
 }
 
 education_entries = [
@@ -129,7 +134,7 @@ doc_reordered.add_heading('Languages', level=2)
 doc_reordered.add_paragraph("Tamil, English")
 
 # Save the reordered resume
-output_path_reordered_docx = "Kishore_Resume_Final_Reordered.docx"  # Change this line
+output_path_reordered_docx = "Kishore_Resume_Final_Reordered.docx"
 doc_reordered.save(output_path_reordered_docx)
 
 output_path_reordered_docx
