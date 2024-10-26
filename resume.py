@@ -1,56 +1,7 @@
 from docx import Document
-from docx.shared import Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_PARAGRAPH_ALIGNMENT
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-# Helper function to set paragraph space after
-def set_paragraph_spacing(paragraph, space_after=6):
-    paragraph_format = paragraph.paragraph_format
-    paragraph_format.space_after = Pt(space_after)
-
-# Helper function for line breaks
-def add_line_break(doc, num_breaks=1):
-    for _ in range(num_breaks):
-        doc.add_paragraph()
-
-# Create a new document
-doc_reordered = Document()
-
-# Title and Contact Information
-title = doc_reordered.add_heading('KISHORE SHARMA', 0)
-title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-title_run = title.runs[0]
-title_run.font.size = Pt(20)
-
-subtitle = doc_reordered.add_paragraph('Senior Software Engineer')
-subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-subtitle_run = subtitle.runs[0]
-subtitle_run.bold = True
-subtitle_run.font.size = Pt(12)
-
-contact_info = doc_reordered.add_paragraph(
-    "Phone: (+91) 8015002126 | Email: kisaron5@gmail.com | Location: Chennai, India | LinkedIn: linkedin.com/in/kishore-sharma-sundaram-260a18120/"
-)
-contact_info.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-add_line_break(doc_reordered)
-
-# Professional Summary Section
-doc_reordered.add_heading('Professional Summary', level=1)
-summary = doc_reordered.add_paragraph(
-    "Highly skilled SRE and DevOps Engineer with over 7 years of experience in CI/CD automation, software configuration management, and infrastructure management. "
-    "Expertise in implementing and supporting CI/CD pipelines, build & release management, and automation infrastructure for monitoring. Proficient in various DevOps "
-    "and cloud platforms, with a focus on enhancing system reliability and operational efficiency."
-)
-set_paragraph_spacing(summary)
-
-add_line_break(doc_reordered)
-
-# Key Skills Section
-doc_reordered.add_heading('Key Skills & Tools', level=1)
-
-# Structure skills in two columns for a better look
+# Updated skill categories with Helm only once
 skill_categories = {
     "Programming Languages": ["Python", "Shell Scripting", "Groovy"],
     "DevOps Tools": ["Jenkins", "GitLab CI", "GitHub Actions", "AutoCM", "Docker", "Kubernetes (Helm 3)", "Ansible", "Azure DevOps", "Maven"],
@@ -60,27 +11,41 @@ skill_categories = {
     "Artifact Management": ["Nexus"],
     "Atlassian Tools": ["JIRA", "Confluence"],
     "Ticketing Tools": ["JIRA", "CA Service Desk", "BMC Remedy", "ServiceNow"],
-    "Infrastructure as Code (IaC)": ["Terraform"],
+    "Infrastructure as Code (IaC)": ["Terraform"]
 }
 
-# Add skills in a two-column format for better readability
-skills_table = doc_reordered.add_table(rows=0, cols=2)
-skills_table.style = 'Table Grid'
+education_entries = [
+    {"degree": "B.Tech in Computer Science", "institution": "Anna University", "year": "2015", "score": "8.5 CGPA"}
+]
 
-for category, skills in skill_categories.items():
-    row_cells = skills_table.add_row().cells
-    row_cells[0].paragraphs[0].add_run(f"{category}: ").bold = True
-    row_cells[0].paragraphs[0].add_run(", ".join(skills))
-    
-# Adjusting column width
-for row in skills_table.rows:
-    row.cells[0].width = Pt(300)
-    row.cells[1].width = Pt(300)
+projects = [
+    "CI/CD pipeline setup for microservices architecture using Jenkins and Kubernetes.",
+    "Infrastructure monitoring with Prometheus and Grafana.",
+    "Automation of deployment processes using Ansible and Terraform."
+]
 
-add_line_break(doc_reordered)
+# Creating a new Document
+doc_reordered = Document()
 
-# Work Experience Section
-doc_reordered.add_heading('Work Experience', level=1)
+# Title and Contact Information
+doc_reordered.add_heading('KISHORE SHARMA', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
+subtitle = doc_reordered.add_heading('Senior Software Engineer', level=1)
+subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+contact_info = doc_reordered.add_paragraph(
+    "Phone: (+91) 8015002126 | Email: kisaron5@gmail.com | Location: Chennai, India | LinkedIn: linkedin.com/in/kishore-sharma-sundaram-260a18120/"
+)
+contact_info.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+# Professional Summary
+doc_reordered.add_heading('Professional Summary', level=2)
+doc_reordered.add_paragraph(
+    "- Highly skilled SRE and DevOps Engineer with over 7 years of experience in CI/CD automation, software configuration management, and infrastructure management.\n"
+    "- Expertise in implementing and supporting CI/CD pipelines, build & release management, and automation infrastructure for monitoring.\n"
+    "- Proficient in various DevOps and cloud platforms, with a focus on enhancing system reliability and operational efficiency."
+)
+
+# Work Experience with updated sequence
+doc_reordered.add_heading('Work Experience', level=2)
 
 experiences_reordered = [
     {
@@ -94,46 +59,81 @@ experiences_reordered = [
             "Enhanced productivity with GitHub Copilot and VS Code."
         ]
     },
-    # Additional experiences...
+    {
+        "position": "Technical Lead - HCL Technologies",
+        "dates": "06/2021 - 11/2023",
+        "responsibilities": [
+            "Led CI/CD implementation and observability practices, improving system reliability and deployment speed.",
+            "Managed Jenkins and Ansible automation, streamlining pipeline processes across teams.",
+            "Conducted migration projects, including Bitbucket to GitLab and Azure Git to GitHub, using automated solutions."
+        ]
+    },
+    {
+        "position": "Senior DevOps Engineer - Walmart",
+        "dates": "03/2021 - 06/2021",
+        "responsibilities": [
+            "Configured Jenkins CI/CD for application deployments, improving release consistency."
+        ]
+    },
+    {
+        "position": "Senior DevOps Engineer - Accenture",
+        "dates": "03/2020 - 03/2021",
+        "responsibilities": [
+            "Improved CI/CD stability by enhancing build and release management processes."
+        ]
+    },
+    {
+        "position": "Senior Infra Developer - Cognizant",
+        "dates": "05/2019 - 03/2020",
+        "responsibilities": [
+            "Assisted clients with CI/CD implementation, focusing on DevOps development and support.",
+            "Built and managed automation infrastructure with advanced monitoring tools.",
+            "Ensured process adherence to SCM standards across projects, contributing to system stability."
+        ]
+    },
+    {
+        "position": "Software Engineer - Virtusa",
+        "dates": "12/2015 - 05/2019",
+        "responsibilities": [
+            "Developed efficient build and deployment processes as part of the DevOps team."
+        ]
+    }
 ]
 
 for job in experiences_reordered:
-    experience_paragraph = doc_reordered.add_paragraph()
-    experience_paragraph.add_run(f"{job['position']} ({job['dates']})").bold = True
+    p = doc_reordered.add_paragraph()
+    p.add_run(f"{job['position']} ({job['dates']})").bold = True
     for responsibility in job['responsibilities']:
         doc_reordered.add_paragraph(f"   - {responsibility}", style='List Bullet')
-    add_line_break(doc_reordered, num_breaks=1)
+
+# Key Skills and Tools
+doc_reordered.add_heading('Key Skills & Tools', level=2)
+
+for category, skills in skill_categories.items():
+    p = doc_reordered.add_paragraph()
+    p.add_run(f"{category}: ").bold = True
+    p.add_run(", ".join(skills))
 
 # Education Section
-doc_reordered.add_heading('Education', level=1)
-education_entries = [
-    {"degree": "B.Tech in Computer Science", "institution": "Anna University", "year": "2015", "score": "8.5 CGPA"}
-]
+doc_reordered.add_heading('Education', level=2)
 
 for edu in education_entries:
     p = doc_reordered.add_paragraph()
     p.add_run(f"{edu['degree']} - {edu['institution']} ({edu['year']})")
     if "score" in edu:
         p.add_run(f", Score: {edu['score']}")
-        
-add_line_break(doc_reordered)
 
 # Projects Section
-doc_reordered.add_heading('Projects', level=1)
-projects = [
-    "CI/CD pipeline setup for microservices architecture using Jenkins and Kubernetes.",
-    "Infrastructure monitoring with Prometheus and Grafana.",
-    "Automation of deployment processes using Ansible and Terraform."
-]
+doc_reordered.add_heading('Projects', level=2)
 
 for project in projects:
     doc_reordered.add_paragraph(f"- {project}", style='List Bullet')
 
 # Languages Section
-doc_reordered.add_heading('Languages', level=1)
+doc_reordered.add_heading('Languages', level=2)
 doc_reordered.add_paragraph("Tamil, English")
 
-# Save the document
+# Save the reordered resume
 output_path_reordered_docx = "Kishore_Resume_Final_Formatted.docx"
 doc_reordered.save(output_path_reordered_docx)
 
