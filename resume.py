@@ -15,10 +15,9 @@ skill_categories = {
 }
 
 education_entries = [
-    {"degree": "MBA/PGDM - Systems", "institution": "Madras University", "year": "2018"},
-    {"degree": "B.Sc - Computers", "institution": "St. Joseph's College, Trichy", "year": "2015", "score": "66.22%"},
-    {"degree": "12th Grade", "institution": "Tamil Nadu", "year": "2012", "score": "70.4%"},
-    {"degree": "10th Grade", "institution": "Tamil Nadu", "year": "2010", "score": "81.6%"}
+    {"degree": "B.Sc (Computer Science)", "institution": "Bharathidasan University, Trichy", "year": "2015", "score": "66%"},
+    {"degree": "HSC", "institution": "ST. Joseph’s Higher Secondary School, Trichy", "year": "2012", "score": "70%"},
+    {"degree": "SSLC", "institution": "ST. Joseph’s Higher Secondary School, Trichy", "year": "2010", "score": "82%"}
 ]
 
 projects = [
