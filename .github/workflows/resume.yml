@@ -3,7 +3,7 @@ name: Generate Resume
 on:
   push:
     branches:
-      - main  # Adjust if your default branch is different
+      - feature  # Adjust if your default branch is different
 
 jobs:
   build:
