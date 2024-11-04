@@ -19,6 +19,10 @@ jobs:
       run: |
         pip install PyPDF2 reportlab
 
+    - name: Create output directory
+      run: |
+        mkdir -p output  # Ensure the output directory exists
+
     - name: Run PDF Formatting Script
       run: |
         python format_pdf.py
