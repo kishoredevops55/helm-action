@@ -1,0 +1,33 @@
+name: Format and Align PDF
+
+on:
+  push:
+    paths:
+      - 'input/*.pdf'  # Trigger only if a PDF is pushed in the 'input' folder
+
+jobs:
+  format_pdf:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        pip install PyPDF2 reportlab
+
+    - name: Run PDF Formatting Script
+      run: |
+        python format_pdf.py input/input.pdf output/output.pdf
+
+    - name: Upload PDF Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: formatted-pdf
+        path: output/output.pdf
+        
