@@ -1,9 +1,7 @@
 name: Format and Align PDF
 
 on:
-  push:
-    paths:
-      - 'input/*.pdf'  # Trigger only if a PDF is pushed in the 'input' folder
+  workflow_dispatch:  # Allows for manual triggering of the workflow
 
 jobs:
   format_pdf:
@@ -30,4 +28,3 @@ jobs:
       with:
         name: formatted-pdf
         path: output/output.pdf
-        
