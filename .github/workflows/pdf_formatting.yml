@@ -26,7 +26,7 @@ jobs:
         python format_pdf.py input/input.pdf output/output.pdf
 
     - name: Upload PDF Artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: formatted-pdf
         path: output/output.pdf
