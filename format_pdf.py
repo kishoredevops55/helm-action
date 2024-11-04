@@ -9,7 +9,6 @@ def clean_pdf(input_path, output_path):
     writer = PdfWriter()
     
     for page_num in range(len(reader.pages)):
-        # Add all non-blank or specified pages to new PDF
         page = reader.pages[page_num]
         text = page.extract_text()
         if text and text.strip():
@@ -32,9 +31,9 @@ def clean_pdf(input_path, output_path):
         
     c.save()
     
+    # Write final PDF output
     with open(output_path, "wb") as final_pdf:
         final_pdf.write(output_buffer.getvalue())
 
 if __name__ == "__main__":
-    clean_pdf("input.pdf", "output.pdf")
-  
+    clean_pdf("input/KISHORE_MEDICAL_INSURANCE_BILL_2024_FINAL.pdf", "output/output.pdf")
