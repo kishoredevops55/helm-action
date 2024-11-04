@@ -8,10 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: '3.x'
 
@@ -21,7 +21,7 @@ jobs:
 
     - name: Run PDF Formatting Script
       run: |
-        python format_pdf.py input/input.pdf output/output.pdf
+        python format_pdf.py input/KISHORE_MEDICAL_INSURANCE_BILL_2024_FINAL.pdf output/output.pdf
 
     - name: Upload PDF Artifact
       uses: actions/upload-artifact@v4
