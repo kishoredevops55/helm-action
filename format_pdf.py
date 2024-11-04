@@ -1,6 +1,7 @@
 from PyPDF2 import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
 from io import BytesIO
 
 def clean_pdf(input_path, output_path):
@@ -12,28 +13,25 @@ def clean_pdf(input_path, output_path):
         page = reader.pages[page_num]
         text = page.extract_text()
         if text and text.strip():
+            # Process each page with reportlab for formatting
+            packet = BytesIO()
+            can = canvas.Canvas(packet, pagesize=letter)
+
+            # Draw alignment content on each page
+            can.drawString(1 * inch, 0.5 * inch, "Aligned footer content here")  # Footer example
+            can.save()
+
+            # Move to the beginning of the StringIO buffer
+            packet.seek(0)
+            new_pdf = PdfReader(packet)
+
+            # Merge the original page content with the footer
+            page.merge_page(new_pdf.pages[0])
             writer.add_page(page)
 
-    # Write interim cleaned PDF
-    temp_pdf_path = "/tmp/cleaned.pdf"
-    with open(temp_pdf_path, "wb") as temp_pdf:
-        writer.write(temp_pdf)
-
-    # Step 2: Align last lines and adjust formatting
-    output_buffer = BytesIO()
-    c = canvas.Canvas(output_buffer, pagesize=letter)
-    
-    # Copy and reformat each page
-    temp_reader = PdfReader(temp_pdf_path)
-    for page in temp_reader.pages:
-        c.showPage()
-        c.drawString(72, 100, "Sample aligned content")  # Example alignment for bottom
-        
-    c.save()
-    
-    # Write final PDF output
+    # Write final output PDF
     with open(output_path, "wb") as final_pdf:
-        final_pdf.write(output_buffer.getvalue())
+        writer.write(final_pdf)
 
 if __name__ == "__main__":
     clean_pdf("input/KISHORE_MEDICAL_INSURANCE_BILL_2024_FINAL.pdf", "output/output.pdf")
