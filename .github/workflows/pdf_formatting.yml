@@ -21,7 +21,7 @@ jobs:
 
     - name: Run PDF Formatting Script
       run: |
-        python format_pdf.py input/KISHORE_MEDICAL_INSURANCE_BILL_2024_FINAL.pdf output/output.pdf
+        python format_pdf.py
 
     - name: Upload PDF Artifact
       uses: actions/upload-artifact@v4
