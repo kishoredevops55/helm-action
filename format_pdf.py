@@ -1,6 +1,7 @@
 from PyPDF2 import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch  # Import inch for unit conversion
 from io import BytesIO
 
 def clean_pdf(input_path, output_path):
@@ -17,16 +18,18 @@ def clean_pdf(input_path, output_path):
             packet = BytesIO()
             can = canvas.Canvas(packet, pagesize=letter)
 
-            # Define footer positioning for alignment (use appropriate x and y values)
-            footer_text_y_position = 0.5 * inch  # Adjust as needed for consistent alignment
-            
-            # Extract footer content by finding specific footer lines and repositioning them
+            # Set footer positioning and content without adding new text
             footer_lines = [
                 "Regd.&Corporate Office:1,New Tank Street,Valluvar Kottam High Road,Nungambakkam,Chennai - 600034,Phone : 044 -28302700 / 28288800",
                 "Toll Free No:1800-425-2255 / 1800-102-4477,CIN : L66010TN2005PLC056649 Email :support@starhealth.in Website :www.starhealth.in"
             ]
-            for i, footer_line in enumerate(footer_lines):
-                can.drawString(72, footer_text_y_position + (i * 12), footer_line)
+
+            # Define Y-position for consistent footer placement
+            footer_y_position = 0.5 * inch  # Adjust for proper alignment
+
+            # Draw the original footer lines at the desired Y-position on each page
+            for i, line in enumerate(footer_lines):
+                can.drawString(72, footer_y_position + (i * 12), line)  # Adjust x-position if needed
 
             can.save()
 
