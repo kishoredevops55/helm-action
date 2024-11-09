@@ -1,0 +1,32 @@
+name: Modify Document
+
+on:
+  workflow_dispatch: # Allows manual run from the GitHub Actions tab
+
+jobs:
+  modify-document:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          pip install python-docx PyPDF2
+
+      - name: Run PDF Modification Script
+        run: |
+          python modify_pdf.py DOC-20241105-WA0000..docx DOC-20241105-WA0000_Modified.docx
+
+      - name: Upload modified document
+        uses: actions/upload-artifact@v2
+        with:
+          name: modified-document
+          path: DOC-20241105-WA0000_Modified.docx
+          
