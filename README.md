@@ -1,6 +1,6 @@
 # Kubernetes 1.27: StatefulSet PVC Auto-Deletion
 
-## Introduction
+## Introduction ##
 Kubernetes 1.27 introduced a new PersistentVolumeClaim (PVC) retention policy for StatefulSets, providing greater control over the lifecycle of PVCs associated with StatefulSets. This feature, now in beta, addresses the need for automatic management of PVCs when StatefulSets are deleted or scaled down.
 
 ## Use Case
