@@ -20,30 +20,38 @@ def fetch_dashboards():
     return response.json()
 
 def fetch_dashboard_details_and_usage(dashboard):
-    """Fetch details and usage stats for a single dashboard."""
-    # Dashboard details
+    """Fetch details and accurate view counts for a single dashboard."""
+    # Dashboard metadata
     dashboard_url = f"{GRAFANA_URL}/api/dashboards/uid/{dashboard['uid']}"
     dashboard_response = requests.get(dashboard_url, headers=HEADERS)
     dashboard_response.raise_for_status()
     dashboard_data = dashboard_response.json()
 
-    # Usage stats (via Annotations API or adjust based on your setup)
-    annotations_url = f"{GRAFANA_URL}/api/annotations"
-    params = {
-        "from": int(LAST_30_DAYS.timestamp() * 1000),  # Convert to milliseconds
-        "to": int(NOW.timestamp() * 1000),
-        "dashboardId": dashboard["id"],
-    }
-    annotations_response = requests.get(annotations_url, headers=HEADERS, params=params)
-    annotations_response.raise_for_status()
-    usage_count = len(annotations_response.json())
+    # Accurate view count via /api/dashboard-stats
+    view_count = fetch_view_count(dashboard["id"])
 
     return {
         "Name": dashboard_data["dashboard"]["title"],
         "UID": dashboard['uid'],
         "Folder": dashboard_data["meta"]["folderTitle"],
-        "Views (last 30 days)": usage_count,
+        "Views (last 30 days)": view_count,
     }
+
+def fetch_view_count(dashboard_id):
+    """Fetch accurate view counts using Grafana's /api/dashboard-stats endpoint."""
+    stats_url = f"{GRAFANA_URL}/api/dashboard-stats/{dashboard_id}"
+    response = requests.get(stats_url, headers=HEADERS)
+    response.raise_for_status()
+    stats = response.json()
+
+    # Filter view counts for the last 30 days
+    views_last_30_days = 0
+    for entry in stats["data"]:
+        view_timestamp = datetime.fromtimestamp(entry["timestamp"] / 1000)  # Convert ms to seconds
+        if LAST_30_DAYS <= view_timestamp <= NOW:
+            views_last_30_days += 1
+
+    return views_last_30_days
 
 def export_to_excel(data):
     """Export the collected data to an Excel file."""
@@ -71,3 +79,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
