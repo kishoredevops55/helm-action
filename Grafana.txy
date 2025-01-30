@@ -1,0 +1,17 @@
+**Subject:** Request for API to Retrieve Dashboard Views (Most & Least Used) in Grafana Enterprise  
+
+**Dear Grafana Support Team,**  
+
+We are using **Grafana Enterprise** and need to programmatically retrieve **dashboard usage insights** via API. Specifically, we want to fetch:  
+
+1. **Dashboard Name, UID, Folder Location**  
+2. **View Counts for the Last 30 Days** (Most and Least Viewed Dashboards)  
+
+The official documentation ([Sort Dashboards by Using Insights Data](https://grafana.com/docs/grafana/latest/dashboards/assess-dashboard-usage/#sort-dashboards-by-using-insights-data)) mentions this feature but does not provide a direct API reference.  
+
+Could you confirm:  
+- Is there a **dedicated API endpoint** for fetching usage insights (views per dashboard over time)?  
+- If not, what is the **recommended approach** to extract this data via API?  
+- Can we retrieve this data directly from Grafana’s database or logs (e.g., via Loki/Prometheus queries)?  
+
+This is critical for our automation use case, so we appreciate detailed guidance.  
