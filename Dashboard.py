@@ -12,7 +12,7 @@ HEADERS = {
 }
 
 def fetch_dashboards():
-    """Fetch the list of all dashboards sorted by views in the last 30 days."""
+    """Fetch all dashboards sorted by views in the last 30 days from search-v2 API."""
     url = f"{GRAFANA_URL}/api/search-v2"
     body = {
         "query": "",
@@ -32,10 +32,25 @@ def fetch_dashboards():
         print(f"Request error: {e}")
         return None
 
-def fetch_folder_path(folder_uid):
-    """Fetch full folder path given a folder UID."""
+def fetch_dashboard_title(uid):
+    """Fetch the correct dashboard name using the dashboard UID."""
+    url = f"{GRAFANA_URL}/api/dashboards/uid/{uid}"
+
+    try:
+        response = requests.get(url, headers=HEADERS)
+        response.raise_for_status()
+        dashboard_info = response.json()
+        return dashboard_info.get("dashboard", {}).get("title", "Unknown Dashboard")
+    except requests.exceptions.RequestException:
+        return "Unknown Dashboard"
+
+def fetch_folder_path(folder_uid, folder_cache):
+    """Recursively fetch the full folder path for a folder UID."""
     if not folder_uid:
         return "General"
+
+    if folder_uid in folder_cache:  # Use cache to avoid redundant API calls
+        return folder_cache[folder_uid]
 
     url = f"{GRAFANA_URL}/api/folders/{folder_uid}"
     
@@ -43,7 +58,17 @@ def fetch_folder_path(folder_uid):
         response = requests.get(url, headers=HEADERS)
         response.raise_for_status()
         folder_info = response.json()
-        return folder_info.get("title", "Unknown Folder")
+        
+        folder_title = folder_info.get("title", "Unknown Folder")
+        parent_uid = folder_info.get("parentUid")  # Get parent folder UID
+
+        if parent_uid:
+            full_path = f"{fetch_folder_path(parent_uid, folder_cache)}/{folder_title}"
+        else:
+            full_path = folder_title
+
+        folder_cache[folder_uid] = full_path  # Store in cache
+        return full_path
     except requests.exceptions.RequestException:
         return "Unknown Folder"
 
@@ -53,6 +78,7 @@ def main():
         print("Unexpected response structure")
         return
 
+    folder_cache = {}  # Cache to store folder paths
     data = []
     
     for item in dashboards["frames"]:
@@ -61,12 +87,14 @@ def main():
             print("Unexpected data structure in item")
             continue
 
-        names, uids, folder_uids, views = values[0], values[1], values[2], values[8]
+        uids, folder_uids, views = values[1], values[2], values[8]
 
-        for name, uid, folder_uid, view in zip(names, uids, folder_uids, views):
-            full_folder_path = fetch_folder_path(folder_uid)
+        for uid, folder_uid, view in zip(uids, folder_uids, views):
+            dashboard_name = fetch_dashboard_title(uid)  # Fetch correct dashboard name
+            full_folder_path = fetch_folder_path(folder_uid, folder_cache)  # Get full folder path
+
             data.append({
-                "Dashboard Name": name,
+                "Dashboard Name": dashboard_name,  
                 "UID": uid,
                 "Folder Path": full_folder_path,
                 "Views (Last 30 Days)": view
