@@ -1,94 +1,82 @@
+import logging
 import requests
 import pandas as pd
 from datetime import datetime
 
-# Set your Grafana URL and API Key
+# Configuration
 GRAFANA_URL = "https://your-grafana-instance.com"  # Replace with your Grafana URL
-API_KEY = "your_api_key_here"  # Replace with your actual API key
-
+API_TOKEN = "your_api_token"  # Replace with your Grafana API token
 HEADERS = {
-    "Authorization": f"Bearer {API_KEY}",
+    "Authorization": f"Bearer {API_TOKEN}",
     "Content-Type": "application/json"
 }
 
-def fetch_all_dashboards():
-    """Fetch all dashboards, ensuring none are missing by handling pagination."""
+# Set up logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+def fetch_dashboards():
     url = f"{GRAFANA_URL}/api/search"
-    dashboards = []
-    page = 1
-    limit = 50  # Process dashboards in batches
-
-    while True:
-        params = {
-            "query": "",
-            "type": "dash-db",
-            "sort": "views_last_30_days",
-            "order": "desc",
-            "limit": limit,
-            "page": page  # Paginate through results
-        }
-        
-        try:
-            response = requests.get(url, headers=HEADERS, params=params)
-            response.raise_for_status()
-            batch = response.json()
-
-            if not batch:
-                break  # Stop if no more dashboards are found
-
-            dashboards.extend(batch)
-            page += 1  # Move to the next page
-
-        except requests.exceptions.RequestException as e:
-            print(f"Request error: {e}")
-            break
-
-    return dashboards
-
-def fetch_dashboard_details(uid):
-    """Fetch the dashboard name and full folder path using the dashboard UID."""
-    url = f"{GRAFANA_URL}/api/dashboards/uid/{uid}"
-
+    body = {
+        "query": "",
+        "tags": [],
+        "sort": "-views_last_30_days",
+        "starred": False,
+        "deleted": False,
+        "kind": ["dashboard"],  # Removed "folder" as we only care about dashboards
+        "limit": 5000  # Increased limit to a more reasonable number. Grafana API might have limits.
+    }
+    
     try:
-        response = requests.get(url, headers=HEADERS)
-        response.raise_for_status()
-        dashboard_info = response.json()
-        
-        dashboard_name = dashboard_info.get("dashboard", {}).get("title", "Unknown Dashboard")
-        folder_title = dashboard_info.get("meta", {}).get("folderTitle", "General")  # Correct folder name
-
-        return dashboard_name, folder_title
-    except requests.exceptions.RequestException:
-        return "Unknown Dashboard", "Unknown Folder"
+        response = requests.post(url, json=body, headers=HEADERS)
+        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logging.error(f"API request failed: {e}")
+        if response.status_code == 401:  # Example of more specific error handling
+            logging.error("Check your API token. It might be incorrect or have insufficient permissions.")
+        return None
 
 def main():
-    dashboards = fetch_all_dashboards()
-    if not dashboards:
-        print("Unexpected response structure or missing dashboards")
-        return
+    try:
+        dashboards = fetch_dashboards()
+        if not dashboards:
+            logging.warning("No dashboards received. Check your Grafana URL and API token.")
+            return
 
-    data = []
-    
-    for item in dashboards:
-        uid = item.get("uid")
-        view_count = item.get("viewCount", 0)  # Extract views directly
+        data = []
+        for item in dashboards:
+            try:
+                dashboard_data = {
+                    "name": item.get('title'),
+                    "folder": item.get('folderTitle', 'General'),
+                    "views_last_30_days": item.get('views_last_30_days', 0),
+                    "url": f"{GRAFANA_URL}{item.get('url')}",
+                    "uid": item.get('uid'),
+                    "created": item.get('created'),
+                    "updated": item.get('updated')
+                }
+                data.append(dashboard_data)
+            except Exception as e:
+                logging.error(f"Error processing dashboard {item.get('title')}: {e}")
 
-        dashboard_name, folder_path = fetch_dashboard_details(uid)
+        # Create DataFrame
+        df = pd.DataFrame(data)
 
-        data.append({
-            "Dashboard Name": dashboard_name,  
-            "UID": uid,
-            "Folder Path": folder_path,  # Now correctly fetching folder path
-            "Views (Last 30 Days)": view_count
-        })
+        # Add timestamp to filename
+        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        excel_filename = f"dashboard_usage_{current_time}.xlsx"
+        
+        # Sort and export to Excel
+        df.sort_values(by='views_last_30_days', ascending=False, inplace=True)
+        df.to_excel(excel_filename, index=False)
+        logging.info(f"Data exported successfully to {excel_filename}")
 
-    # Export to Excel
-    df = pd.DataFrame(data)
-    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-    excel_filename = f"grafana_dashboard_usage_{current_time}.xlsx"
-    df.to_excel(excel_filename, index=False, engine="openpyxl")
-
-    print(f"Data exported successfully to: {excel_filename}")
+        # Optional: Save as CSV as well
+        df.to_csv(f"dashboard_usage_{current_time}.csv", index=False)
+        logging.info(f"Data also exported as CSV.")
+        
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()
