@@ -1,4 +1,4 @@
-name: unattached-pvc-check-list
+name: unattached-pvc-check-list-aks
 
 on:
   workflow_call:
