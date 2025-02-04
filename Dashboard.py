@@ -11,92 +11,76 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-def fetch_dashboards():
-    """Fetch all dashboards sorted by views in the last 30 days from search-v2 API."""
-    url = f"{GRAFANA_URL}/api/search-v2"
-    body = {
-        "query": "",
-        "tags": [],
-        "sort": "-views_last_30_days",
-        "starred": False,
-        "deleted": False,
-        "kind": ["dashboard"],
-        "limit": 1000  # Adjust limit as needed
-    }
+def fetch_all_dashboards():
+    """Fetch all dashboards, ensuring none are missing by handling pagination."""
+    url = f"{GRAFANA_URL}/api/search"
+    dashboards = []
+    page = 1
+    limit = 50  # Process dashboards in batches
 
-    try:
-        response = requests.post(url, json=body, headers=HEADERS)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Request error: {e}")
-        return None
+    while True:
+        params = {
+            "query": "",
+            "type": "dash-db",
+            "sort": "views_last_30_days",
+            "order": "desc",
+            "limit": limit,
+            "page": page  # Paginate through results
+        }
+        
+        try:
+            response = requests.get(url, headers=HEADERS, params=params)
+            response.raise_for_status()
+            batch = response.json()
+
+            if not batch:
+                break  # Stop if no more dashboards are found
+
+            dashboards.extend(batch)
+            page += 1  # Move to the next page
+
+        except requests.exceptions.RequestException as e:
+            print(f"Request error: {e}")
+            break
+
+    return dashboards
 
 def fetch_dashboard_details(uid):
-    """Fetch the correct dashboard name and folder ID using the dashboard UID."""
+    """Fetch the dashboard name and full folder path using the dashboard UID."""
     url = f"{GRAFANA_URL}/api/dashboards/uid/{uid}"
 
     try:
         response = requests.get(url, headers=HEADERS)
         response.raise_for_status()
         dashboard_info = response.json()
+        
         dashboard_name = dashboard_info.get("dashboard", {}).get("title", "Unknown Dashboard")
-        folder_id = dashboard_info.get("meta", {}).get("folderId", None)  # Fetch folder ID
-        return dashboard_name, folder_id
+        folder_title = dashboard_info.get("meta", {}).get("folderTitle", "General")  # Correct folder name
+
+        return dashboard_name, folder_title
     except requests.exceptions.RequestException:
-        return "Unknown Dashboard", None
-
-def fetch_folder_name(folder_id, folder_cache):
-    """Fetch the folder name using the folder ID."""
-    if folder_id is None or folder_id == 0:
-        return "General"
-
-    if folder_id in folder_cache:
-        return folder_cache[folder_id]
-
-    url = f"{GRAFANA_URL}/api/folders"
-    
-    try:
-        response = requests.get(url, headers=HEADERS)
-        response.raise_for_status()
-        folders = response.json()
-
-        for folder in folders:
-            if folder["id"] == folder_id:
-                folder_cache[folder_id] = folder["title"]
-                return folder["title"]
-
-        return "Unknown Folder"
-    except requests.exceptions.RequestException:
-        return "Unknown Folder"
+        return "Unknown Dashboard", "Unknown Folder"
 
 def main():
-    dashboards = fetch_dashboards()
-    if not dashboards or "frames" not in dashboards:
-        print("Unexpected response structure")
+    dashboards = fetch_all_dashboards()
+    if not dashboards:
+        print("Unexpected response structure or missing dashboards")
         return
 
-    folder_cache = {}  # Cache to store folder names
     data = []
     
-    for item in dashboards["frames"]:
-        values = item.get("data", {}).get("values", [])
-        if len(values) < 9:
-            print("Unexpected data structure in item")
-            continue
+    for item in dashboards:
+        uid = item.get("uid")
+        view_count = item.get("viewCount", 0)  # Extract views directly
 
-        uids, views = values[1], values[8]
+        dashboard_name, folder_path = fetch_dashboard_details(uid)
 
-        for uid, view in zip(uids, views):
-            dashboard_name, folder_id = fetch_dashboard_details(uid)  # Fetch dashboard name & folder ID
-            folder_name = fetch_folder_name(folder_id, folder_cache)  # Get correct folder name
-
-            data.append({
-                "Dashboard Name": dashboard_name,  
-                "UID": uid,
-                "Folder Path": folder_name,  # Corrected folder path
-                "Views (Last 30 Days)": view
-            })
+        data.append({
+            "Dashboard Name": dashboard_name,  
+            "UID": uid,
+            "Folder Path": folder_path,  # Now correctly fetching folder path
+            "Views (Last 30 Days)": view_count
+        })
 
     # Export to Excel
     df = pd.DataFrame(data)
@@ -108,3 +92,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
