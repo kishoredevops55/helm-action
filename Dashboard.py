@@ -2,7 +2,7 @@ import requests
 import os
 import pandas as pd
 from datetime import datetime
-import time  # optional, for throttling API calls
+import time  # Optional, for throttling API calls
 
 # -------------------------
 # Configuration
@@ -70,7 +70,7 @@ def fetch_dashboard_details(uid):
     """
     For a given dashboard UID, retrieve detailed info using GET /api/dashboards/uid/<uid>.
     Returns a tuple: (dashboard_title, folder_uid)
-    - dashboard_title is obtained from the 'title' key within the 'dashboard' object.
+    - dashboard_title is obtained from the 'title' key inside the 'dashboard' object.
     - folder_uid is obtained from meta.folderUid.
     """
     details_url = f"{GRAFANA_URL}/api/dashboards/uid/{uid}"
@@ -80,7 +80,7 @@ def fetch_dashboard_details(uid):
         details = response.json()
         dashboard_title = details.get("dashboard", {}).get("title", "Unknown Dashboard")
         meta = details.get("meta", {})
-        folder_uid = meta.get("folderUid")  # This is the reliable folder UID for this dashboard
+        folder_uid = meta.get("folderUid")
         return dashboard_title, folder_uid
     except requests.exceptions.RequestException:
         return "Unknown Dashboard", None
@@ -88,63 +88,62 @@ def fetch_dashboard_details(uid):
 
 def get_full_folder_path(folder_uid, folder_mapping):
     """
-    Given a folder UID and a folder mapping, recursively build the full folder path.
-    If folder_uid is missing or not found in folder_mapping, returns "Dashboards".
+    Given a folder UID and a folder mapping, build the full folder path.
     
-    For example, if a folder is nested as:
+    - If folder_uid is missing or not found, return "Dashboards".
+    - If the folder's title is "General", return "Dashboards".
+    - Otherwise, build the full path by prepending parent folders until a parent
+      with title "General" is encountered.
+      
+    For example, if a dashboard is in:
         Parent Folder -> Child Folder
-    The full path becomes: "Parent Folder / Child Folder".
-    
-    Additionally, if a folder's title is "General", it is replaced with "Dashboards".
+    the full path will be: "Parent Folder / Child Folder".
     """
     if not folder_uid or folder_uid not in folder_mapping:
         return "Dashboards"
     
-    path_parts = []
-    current = folder_mapping[folder_uid]
+    folder = folder_mapping[folder_uid]
+    # If the folder's title is "General", then it means no custom folder was set.
+    if folder.get("title", "") == "General":
+        return "Dashboards"
     
-    # Loop to build the full path using parentUid if present.
-    while current:
-        title = current.get("title", "")
-        if title == "General":
-            title = "Dashboards"
-        path_parts.insert(0, title)
+    path_parts = [folder.get("title", "")]
+    current = folder
+    while current.get("parentUid"):
         parent_uid = current.get("parentUid")
-        if parent_uid and parent_uid in folder_mapping:
-            current = folder_mapping.get(parent_uid)
+        if parent_uid in folder_mapping:
+            parent = folder_mapping[parent_uid]
+            # Stop if parent is the default folder "General"
+            if parent.get("title", "") == "General":
+                break
+            path_parts.insert(0, parent.get("title", ""))
+            current = parent
         else:
-            current = None
-    full_path = " / ".join(path_parts)
-    return full_path
+            break
+    return " / ".join(path_parts)
 
 
 def extract_dashboard_data(dashboards, folder_mapping):
     """
     Extracts each dashboard's actual title, UID, full folder path, and last 30 days' view count.
-    
-    Instead of using the folder UID from the search-v2 response, this function calls
-    fetch_dashboard_details() to get the reliable dashboard title and folder UID.
+    Uses fetch_dashboard_details() to get a reliable dashboard title and folder UID.
     """
     data = []
     if "frames" not in dashboards:
         print("Unexpected response structure.")
         return data
 
-    # search-v2 returns frames; we loop through them
     for item in dashboards["frames"]:
         values = item.get("data", {}).get("values", [])
         if len(values) < 9:
             print("Unexpected data structure in item; skipping.")
             continue
 
-        # From search-v2:
-        #   values[1] contains dashboard UIDs,
-        #   values[8] contains view counts.
+        # values[1] contains dashboard UIDs, values[8] contains view counts.
         uids = values[1]
         views = values[8]
 
         for uid, view in zip(uids, views):
-            # Fetch the dashboard details to get the actual title and folder UID
             dashboard_title, folder_uid = fetch_dashboard_details(uid)
             full_folder_path = get_full_folder_path(folder_uid, folder_mapping)
             data.append({
