@@ -8,17 +8,16 @@ GRAFANA_URL = os.getenv("GRAFANA_URL", "https://example.com/grafana")
 API_KEY = os.getenv("GRAFANA_API_KEY")
 
 if not API_KEY or not API_KEY.strip():
-    raise ValueError("GRAFANA_API_KEY environment variable is not set or empty")
+    raise ValueError("GRAFANA_API_KEY is not set or empty")
 
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json"
 }
 
-# Grafana API endpoint
 SEARCH_API_URL = f"{GRAFANA_URL}/api/search-v2"
 
-# API payload to fetch dashboards sorted by views in the last 30 days
+# API payload for fetching dashboards sorted by views in the last 30 days
 payload = {
     "query": "+",
     "tags": [],
@@ -26,7 +25,7 @@ payload = {
     "starred": False,
     "deleted": False,
     "kind": ["dashboard", "folder"],
-    "limit": 5000  # Increase limit to ensure no data is missed
+    "limit": 5000
 }
 
 
@@ -38,7 +37,7 @@ def fetch_dashboards():
 
 
 def extract_dashboard_data(dashboards):
-    """Extracts dashboard name, UID, full folder path, and last 30 days' views count."""
+    """Extracts dashboard name, UID, folder path, and last 30 days' views count."""
     data = []
 
     if "frames" not in dashboards:
@@ -54,28 +53,31 @@ def extract_dashboard_data(dashboards):
         names, uids, folders, views = values[0], values[1], values[2], values[8]
 
         for name, uid, folder, view in zip(names, uids, folders, views):
-            folder_path = resolve_full_folder_path(folder)
+            full_folder_path = fetch_folder_path(uid, folder)
             data.append({
                 "Dashboard Name": name,
                 "UID": uid,
-                "Folder Path": folder_path,
+                "Folder Path": full_folder_path,
                 "Views (Last 30 Days)": view
             })
 
     return data
 
 
-def resolve_full_folder_path(folder_uid):
-    """Fetches the full folder path including parent and subfolders."""
+def fetch_folder_path(uid, folder_uid):
+    """Builds full folder path including subfolders."""
     if not folder_uid:
-        return "General"  # Default folder
+        return "General"
 
-    folder_url = f"{GRAFANA_URL}/api/folders/{folder_uid}"
+    folder_url = f"{GRAFANA_URL}/api/folders"
     try:
         response = requests.get(folder_url, headers=HEADERS)
         response.raise_for_status()
-        folder_data = response.json()
-        return folder_data.get("title", "Unknown Folder")
+        folders = response.json()
+        
+        # Find folder title
+        folder_title = next((f["title"] for f in folders if f["uid"] == folder_uid), "Unknown Folder")
+        return folder_title
     except requests.exceptions.RequestException:
         return "Unknown Folder"
 
