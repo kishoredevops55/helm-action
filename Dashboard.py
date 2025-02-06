@@ -23,7 +23,7 @@ HEADERS = {
 SEARCH_API_URL = f"{GRAFANA_URL}/api/search-v2"
 FOLDERS_API_URL = f"{GRAFANA_URL}/api/folders"
 
-# Payload to fetch only dashboards
+# Payload to fetch only dashboards from search-v2
 payload = {
     "query": "+",
     "tags": [],
@@ -51,8 +51,8 @@ def fetch_folders():
     """
     Fetch all folders from Grafana.
     Returns a mapping from folder UID to the folder object.
-    Note: If your Grafana instance supports nested folders, folder objects should
-    include a 'parentUid' key.
+    If your Grafana supports nested folders, each folder object is expected
+    to have a 'parentUid' key.
     """
     try:
         response = requests.get(FOLDERS_API_URL, headers=HEADERS)
@@ -69,7 +69,9 @@ def fetch_folders():
 def fetch_dashboard_details(uid):
     """
     For a given dashboard UID, retrieve detailed info using GET /api/dashboards/uid/<uid>.
-    Returns the dashboard's actual title (using the 'title' key inside the 'dashboard' object).
+    Returns a tuple: (dashboard_title, folder_uid)
+    - dashboard_title is obtained from the 'title' key within the 'dashboard' object.
+    - folder_uid is obtained from meta.folderUid.
     """
     details_url = f"{GRAFANA_URL}/api/dashboards/uid/{uid}"
     try:
@@ -77,32 +79,30 @@ def fetch_dashboard_details(uid):
         response.raise_for_status()
         details = response.json()
         dashboard_title = details.get("dashboard", {}).get("title", "Unknown Dashboard")
-        return dashboard_title
+        meta = details.get("meta", {})
+        folder_uid = meta.get("folderUid")  # This is the reliable folder UID for this dashboard
+        return dashboard_title, folder_uid
     except requests.exceptions.RequestException:
-        return "Unknown Dashboard"
+        return "Unknown Dashboard", None
 
 
 def get_full_folder_path(folder_uid, folder_mapping):
     """
     Given a folder UID and a folder mapping, recursively build the full folder path.
-    If no folder is found or if folder_uid is empty, returns "Dashboards".
+    If folder_uid is missing or not found in folder_mapping, returns "Dashboards".
     
-    For example, if a folder is nested:
+    For example, if a folder is nested as:
         Parent Folder -> Child Folder
     The full path becomes: "Parent Folder / Child Folder".
     
-    If the folder title is "General", it's substituted with "Dashboards".
+    Additionally, if a folder's title is "General", it is replaced with "Dashboards".
     """
     if not folder_uid or folder_uid not in folder_mapping:
         return "Dashboards"
     
-    folder = folder_mapping[folder_uid]
-    # If the folder title is "General", treat it as the default ("Dashboards")
-    if folder.get("title", "") == "General":
-        return "Dashboards"
-    
     path_parts = []
-    current = folder
+    current = folder_mapping[folder_uid]
+    
     # Loop to build the full path using parentUid if present.
     while current:
         title = current.get("title", "")
@@ -120,30 +120,32 @@ def get_full_folder_path(folder_uid, folder_mapping):
 
 def extract_dashboard_data(dashboards, folder_mapping):
     """
-    Extracts each dashboard's actual title (from details),
-    UID, full folder path, and last 30 days' view count.
+    Extracts each dashboard's actual title, UID, full folder path, and last 30 days' view count.
+    
+    Instead of using the folder UID from the search-v2 response, this function calls
+    fetch_dashboard_details() to get the reliable dashboard title and folder UID.
     """
     data = []
     if "frames" not in dashboards:
         print("Unexpected response structure.")
         return data
 
+    # search-v2 returns frames; we loop through them
     for item in dashboards["frames"]:
         values = item.get("data", {}).get("values", [])
         if len(values) < 9:
             print("Unexpected data structure in item; skipping.")
             continue
 
-        # From the search-v2 result:
-        #   values[1]: list of dashboard UIDs
-        #   values[2]: list of folder UIDs (may be empty or "General")
-        #   values[8]: list of view counts (last 30 days)
+        # From search-v2:
+        #   values[1] contains dashboard UIDs,
+        #   values[8] contains view counts.
         uids = values[1]
-        folder_uids = values[2]
         views = values[8]
 
-        for uid, folder_uid, view in zip(uids, folder_uids, views):
-            dashboard_title = fetch_dashboard_details(uid)
+        for uid, view in zip(uids, views):
+            # Fetch the dashboard details to get the actual title and folder UID
+            dashboard_title, folder_uid = fetch_dashboard_details(uid)
             full_folder_path = get_full_folder_path(folder_uid, folder_mapping)
             data.append({
                 "Dashboard Name": dashboard_title,
@@ -151,15 +153,14 @@ def extract_dashboard_data(dashboards, folder_mapping):
                 "Folder Path": full_folder_path,
                 "Views (Last 30 Days)": view
             })
-            # Optional: small delay to avoid hammering the API
+            # Optional: delay to avoid hammering the API
             time.sleep(0.1)
-            
     return data
 
 
 def export_to_excel(data):
     """
-    Exports the data to an Excel file.
+    Exports the collected dashboard data to an Excel file.
     """
     if not data:
         print("No data to export.")
