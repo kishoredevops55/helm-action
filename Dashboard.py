@@ -50,16 +50,19 @@ def fetch_dashboard_details(uid):
     """
     For a given dashboard UID, retrieve detailed info using GET /api/dashboards/uid/<uid>.
     Returns a tuple: (dashboard_title, folder_title).
-    If an error occurs, defaults to "Unknown Dashboard" and "Unknown Folder".
+    Uses the 'title' key within the 'dashboard' object for the actual dashboard title.
+    If the folder is reported as 'General' (the default parent), it will now return "Dashboards".
     """
     details_url = f"{GRAFANA_URL}/api/dashboards/uid/{uid}"
     try:
         response = requests.get(details_url, headers=HEADERS)
         response.raise_for_status()
         details = response.json()
-        # Use the 'dashboard' object for the dashboard title (key "title")
         dashboard_title = details.get("dashboard", {}).get("title", "Unknown Dashboard")
         folder_title = details.get("meta", {}).get("folderTitle", "General")
+        # If the folder is 'General', replace it with "Dashboards"
+        if folder_title == "General":
+            folder_title = "Dashboards"
         return dashboard_title, folder_title
     except requests.exceptions.RequestException:
         return "Unknown Dashboard", "Unknown Folder"
@@ -83,8 +86,7 @@ def extract_dashboard_data(dashboards):
             print("Unexpected data structure in item; skipping.")
             continue
 
-        # Extract from search-v2 result:
-        # values[1] contains the UIDs, values[8] contains the view counts.
+        # values[1] contains the UIDs and values[8] the view counts.
         uids = values[1]
         views = values[8]
 
