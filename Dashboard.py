@@ -2,14 +2,13 @@ import requests
 import os
 import pandas as pd
 from datetime import datetime
-import time  # optional: for a small delay between requests
+import time  # optional, for throttling API calls
 
 # -------------------------
 # Configuration
 # -------------------------
 GRAFANA_URL = os.getenv("GRAFANA_URL", "https://example.com/grafana")
 API_KEY = os.getenv("GRAFANA_API_KEY")
-
 if not API_KEY or not API_KEY.strip():
     raise ValueError("GRAFANA_API_KEY is not set or empty")
 
@@ -22,14 +21,15 @@ HEADERS = {
 # Endpoints and Payloads
 # -------------------------
 SEARCH_API_URL = f"{GRAFANA_URL}/api/search-v2"
-# Note: we now fetch only dashboards (not folders)
+
+# Fetch only dashboards
 payload = {
     "query": "+",
     "tags": [],
     "sort": "-views_last_30_days",
     "starred": False,
     "deleted": False,
-    "kind": ["dashboard"],  # only dashboards
+    "kind": ["dashboard"],
     "limit": 5000
 }
 
@@ -38,7 +38,7 @@ payload = {
 # -------------------------
 def fetch_dashboards():
     """
-    Fetch dashboards (only dashboards, no folders) sorted by views in the last 30 days.
+    Fetch dashboards sorted by views in the last 30 days.
     Returns the JSON response from search-v2.
     """
     response = requests.post(SEARCH_API_URL, json=payload, headers=HEADERS)
@@ -46,28 +46,29 @@ def fetch_dashboards():
     return response.json()
 
 
-def fetch_dashboard_folder(uid):
+def fetch_dashboard_details(uid):
     """
-    For a given dashboard UID, call the dashboard details endpoint
-    and return the folder title (i.e. its location). If not found, return "General".
+    For a given dashboard UID, retrieve detailed info using GET /api/dashboards/uid/<uid>.
+    Returns a tuple: (dashboard_title, folder_title).
+    If an error occurs, defaults to "Unknown Dashboard" and "Unknown Folder".
     """
     details_url = f"{GRAFANA_URL}/api/dashboards/uid/{uid}"
     try:
         response = requests.get(details_url, headers=HEADERS)
         response.raise_for_status()
-        dashboard_details = response.json()
-        # The details JSON contains a "meta" block with "folderTitle"
-        folder_title = dashboard_details.get("meta", {}).get("folderTitle", "General")
-        return folder_title
+        details = response.json()
+        # Use the 'dashboard' object for the dashboard title (key "title")
+        dashboard_title = details.get("dashboard", {}).get("title", "Unknown Dashboard")
+        folder_title = details.get("meta", {}).get("folderTitle", "General")
+        return dashboard_title, folder_title
     except requests.exceptions.RequestException:
-        return "Unknown Folder"
+        return "Unknown Dashboard", "Unknown Folder"
 
 
 def extract_dashboard_data(dashboards):
     """
-    Extracts dashboard name, UID, folder (location), and last 30 days' views count.
-    Uses the search-v2 response for names, UIDs, and view counts,
-    then calls fetch_dashboard_folder() to resolve the correct folder.
+    Extracts each dashboard's actual title (from details),
+    UID, folder (location), and last 30 days' view count.
     """
     data = []
 
@@ -75,30 +76,29 @@ def extract_dashboard_data(dashboards):
         print("Unexpected response structure from search-v2.")
         return data
 
+    # search-v2 returns a list of frames; each frame's data.values is a list of arrays.
     for item in dashboards["frames"]:
         values = item.get("data", {}).get("values", [])
         if len(values) < 9:
             print("Unexpected data structure in item; skipping.")
             continue
 
-        # values[0]: names, values[1]: uids, values[8]: views
-        names = values[0]
+        # Extract from search-v2 result:
+        # values[1] contains the UIDs, values[8] contains the view counts.
         uids = values[1]
-        # Note: values[2] may be the folder uid from the search,
-        # but we will get the full location from the dashboard details API.
         views = values[8]
 
-        for name, uid, view in zip(names, uids, views):
-            folder_path = fetch_dashboard_folder(uid)
+        for uid, view in zip(uids, views):
+            dashboard_title, folder_title = fetch_dashboard_details(uid)
             data.append({
-                "Dashboard Name": name,
+                "Dashboard Name": dashboard_title,
                 "UID": uid,
-                "Folder Path": folder_path,
+                "Folder Path": folder_title,
                 "Views (Last 30 Days)": view
             })
-            # Optional: small delay to avoid hammering the API if many dashboards exist
+            # Optional: delay to avoid hammering the API
             time.sleep(0.1)
-
+            
     return data
 
 
@@ -113,7 +113,6 @@ def export_to_excel(data):
 
     current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
     excel_filename = f"grafana_dashboard_usage_{current_time}.xlsx"
-
     df.to_excel(excel_filename, index=False, engine="openpyxl")
     print(f"Data exported successfully to: {excel_filename}")
 
