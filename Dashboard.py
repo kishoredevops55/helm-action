@@ -21,8 +21,9 @@ HEADERS = {
 # Endpoints and Payloads
 # -------------------------
 SEARCH_API_URL = f"{GRAFANA_URL}/api/search-v2"
+FOLDERS_API_URL = f"{GRAFANA_URL}/api/folders"
 
-# Fetch only dashboards
+# Payload to fetch only dashboards
 payload = {
     "query": "+",
     "tags": [],
@@ -46,12 +47,29 @@ def fetch_dashboards():
     return response.json()
 
 
+def fetch_folders():
+    """
+    Fetch all folders from Grafana.
+    Returns a mapping from folder UID to the folder object.
+    Note: If your Grafana instance supports nested folders, folder objects should
+    include a 'parentUid' key.
+    """
+    try:
+        response = requests.get(FOLDERS_API_URL, headers=HEADERS)
+        response.raise_for_status()
+        folders = response.json()
+        # Build mapping: uid -> folder object
+        folder_mapping = {folder["uid"]: folder for folder in folders}
+        return folder_mapping
+    except requests.exceptions.RequestException:
+        print("Failed to fetch folders.")
+        return {}
+
+
 def fetch_dashboard_details(uid):
     """
     For a given dashboard UID, retrieve detailed info using GET /api/dashboards/uid/<uid>.
-    Returns a tuple: (dashboard_title, folder_title).
-    Uses the 'title' key within the 'dashboard' object for the actual dashboard title.
-    If the folder is reported as 'General' (the default parent), it will now return "Dashboards".
+    Returns the dashboard's actual title (using the 'title' key inside the 'dashboard' object).
     """
     details_url = f"{GRAFANA_URL}/api/dashboards/uid/{uid}"
     try:
@@ -59,53 +77,90 @@ def fetch_dashboard_details(uid):
         response.raise_for_status()
         details = response.json()
         dashboard_title = details.get("dashboard", {}).get("title", "Unknown Dashboard")
-        folder_title = details.get("meta", {}).get("folderTitle", "General")
-        # If the folder is 'General', replace it with "Dashboards"
-        if folder_title == "General":
-            folder_title = "Dashboards"
-        return dashboard_title, folder_title
+        return dashboard_title
     except requests.exceptions.RequestException:
-        return "Unknown Dashboard", "Unknown Folder"
+        return "Unknown Dashboard"
 
 
-def extract_dashboard_data(dashboards):
+def get_full_folder_path(folder_uid, folder_mapping):
+    """
+    Given a folder UID and a folder mapping, recursively build the full folder path.
+    If no folder is found or if folder_uid is empty, returns "Dashboards".
+    
+    For example, if a folder is nested:
+        Parent Folder -> Child Folder
+    The full path becomes: "Parent Folder / Child Folder".
+    
+    If the folder title is "General", it's substituted with "Dashboards".
+    """
+    if not folder_uid or folder_uid not in folder_mapping:
+        return "Dashboards"
+    
+    folder = folder_mapping[folder_uid]
+    # If the folder title is "General", treat it as the default ("Dashboards")
+    if folder.get("title", "") == "General":
+        return "Dashboards"
+    
+    path_parts = []
+    current = folder
+    # Loop to build the full path using parentUid if present.
+    while current:
+        title = current.get("title", "")
+        if title == "General":
+            title = "Dashboards"
+        path_parts.insert(0, title)
+        parent_uid = current.get("parentUid")
+        if parent_uid and parent_uid in folder_mapping:
+            current = folder_mapping.get(parent_uid)
+        else:
+            current = None
+    full_path = " / ".join(path_parts)
+    return full_path
+
+
+def extract_dashboard_data(dashboards, folder_mapping):
     """
     Extracts each dashboard's actual title (from details),
-    UID, folder (location), and last 30 days' view count.
+    UID, full folder path, and last 30 days' view count.
     """
     data = []
-
     if "frames" not in dashboards:
-        print("Unexpected response structure from search-v2.")
+        print("Unexpected response structure.")
         return data
 
-    # search-v2 returns a list of frames; each frame's data.values is a list of arrays.
     for item in dashboards["frames"]:
         values = item.get("data", {}).get("values", [])
         if len(values) < 9:
             print("Unexpected data structure in item; skipping.")
             continue
 
-        # values[1] contains the UIDs and values[8] the view counts.
+        # From the search-v2 result:
+        #   values[1]: list of dashboard UIDs
+        #   values[2]: list of folder UIDs (may be empty or "General")
+        #   values[8]: list of view counts (last 30 days)
         uids = values[1]
+        folder_uids = values[2]
         views = values[8]
 
-        for uid, view in zip(uids, views):
-            dashboard_title, folder_title = fetch_dashboard_details(uid)
+        for uid, folder_uid, view in zip(uids, folder_uids, views):
+            dashboard_title = fetch_dashboard_details(uid)
+            full_folder_path = get_full_folder_path(folder_uid, folder_mapping)
             data.append({
                 "Dashboard Name": dashboard_title,
                 "UID": uid,
-                "Folder Path": folder_title,
+                "Folder Path": full_folder_path,
                 "Views (Last 30 Days)": view
             })
-            # Optional: delay to avoid hammering the API
+            # Optional: small delay to avoid hammering the API
             time.sleep(0.1)
             
     return data
 
 
 def export_to_excel(data):
-    """Exports the data to an Excel file."""
+    """
+    Exports the data to an Excel file.
+    """
     if not data:
         print("No data to export.")
         return
@@ -120,10 +175,13 @@ def export_to_excel(data):
 
 
 def main():
-    """Main function to fetch, process, and export dashboard data."""
+    """
+    Main function to fetch, process, and export dashboard data.
+    """
     try:
         dashboards = fetch_dashboards()
-        dashboard_data = extract_dashboard_data(dashboards)
+        folder_mapping = fetch_folders()
+        dashboard_data = extract_dashboard_data(dashboards, folder_mapping)
         export_to_excel(dashboard_data)
     except requests.exceptions.RequestException as e:
         print(f"Request error: {e}")
@@ -133,3 +191,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
