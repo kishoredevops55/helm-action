@@ -1,45 +1,29 @@
-# Only components listed here will be ordered first.
-deploymentOrder:
-  distributor: 1
-  ingester: 2
-  compactor: 3
-  querier: 4
+# values.yaml
+orderedFolders:
+  - distributor
+  - ingester
+  - compactor
+  - querier
 
-# All available components. Components not listed in deploymentOrder will be rendered later (in any order).
-components:
-  distributor: {}
-  ingester: {}
-  compactor: {}
-  querier: {}
-  store-gateway: {}
-  query-frontend: {}
 
 {{- /*
-  Build an ordered list from .Values.deploymentOrder.
-  Each entry is a dict with:
-    - name: the component name (e.g. "distributor")
-    - order: the numeric order value
+  Define a named template that renders all YAML files in a given folder.
+  The folder is expected to be inside the "manifests" directory.
+  It uses Files.Glob to retrieve the files and tpl to render them as templates.
 */ -}}
-{{- $ordered := list }}
-{{- range $name, $order := .Values.deploymentOrder }}
-  {{- $ordered = append $ordered (dict "name" $name "order" $order) }}
-{{- end }}
-
-{{- /* Sort the ordered components by the "order" key (ascending) */ -}}
-{{- $ordered = sort $ordered "order" "asc" }}
-
-{{- /* Render the ordered components by invoking their partials */ -}}
-{{- range $ordered }}
-  {{- $compName := .name }}
-  {{- /* Call the named template "mimir.<component>" */ -}}
-  {{- include (print "mimir." $compName) . | nindent 0 }}
-{{- end }}
-
-{{- /* Now render any remaining components (not defined in deploymentOrder) */ -}}
-{{- $orderedNames := keys .Values.deploymentOrder }}
-{{- range $name, $comp := .Values.components }}
-  {{- if not (has $name $orderedNames) }}
-    {{- include (print "mimir." $name) . | nindent 0 }}
+{{- define "mimir.renderFolder" -}}
+  {{- $folder := .folder -}}
+  {{- $files := .Files.Glob (print "manifests/" $folder "/*.yaml") | sort }}
+  {{- range $f := $files }}
+{{ tpl $f.String $. | nindent 2 }}
   {{- end }}
 {{- end }}
 
+{{- /*
+  Loop over the list provided in .Values.orderedFolders.
+  For each folder name, call the defined template "mimir.renderFolder".
+*/ -}}
+{{- range .Values.orderedFolders }}
+  {{- $folderName := . }}
+  {{- include "mimir.renderFolder" (dict "folder" $folderName "Values" $.Values) | nindent 0 }}
+{{- end }}
