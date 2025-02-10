@@ -41,3 +41,21 @@ spec:
 {{- range sort .Values.deploymentOrder "weight" "asc" }}
 {{- include "mimir.component" . | indent 0 }}
 {{- end }}
+
+
+# Step 1: Get sorted deploymentOrder list from values.yaml
+{{- $sortedComponents := sort .Values.deploymentOrder "weight" "asc" }}
+
+# Step 2: Render only the components defined in values.yaml (in order)
+{{- range $sortedComponents }}
+{{- include "mimir.component" . | indent 0 }}
+{{- end }}
+
+# Step 3: Get list of all component folders dynamically
+{{- $definedComponents := (pluck "name" .Values.deploymentOrder) | compact }}
+{{- range .Files.Glob "templates/*" }}
+  {{- $folderName := base . }}
+  {{- if not (has $folderName $definedComponents) }}
+    {{- include "mimir.component" (dict "name" $folderName) | indent 0 }}
+  {{- end }}
+{{- end }}
