@@ -1,77 +1,45 @@
+# Only components listed here will be ordered first.
 deploymentOrder:
-  - name: distributor
-    weight: 1
-  - name: ingester
-    weight: 2
-  - name: compactor
-    weight: 3
-  - name: store-gateway
-    weight: 4
-  - name: query-frontend
-    weight: 5
-  - name: querier
-    weight: 6
-  - name: ruler
-    weight: 7
-  - name: alertmanager
-    weight: 8
+  distributor: 1
+  ingester: 2
+  compactor: 3
+  querier: 4
 
-{{- define "mimir.component" -}}
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ .name }}
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: {{ .name }}
-  template:
-    metadata:
-      labels:
-        app: {{ .name }}
-    spec:
-      containers:
-        - name: {{ .name }}
-          image: grafana/mimir:latest
----
+# All available components. Components not listed in deploymentOrder will be rendered later (in any order).
+components:
+  distributor: {}
+  ingester: {}
+  compactor: {}
+  querier: {}
+  store-gateway: {}
+  query-frontend: {}
+
+{{- /*
+  Build an ordered list from .Values.deploymentOrder.
+  Each entry is a dict with:
+    - name: the component name (e.g. "distributor")
+    - order: the numeric order value
+*/ -}}
+{{- $ordered := list }}
+{{- range $name, $order := .Values.deploymentOrder }}
+  {{- $ordered = append $ordered (dict "name" $name "order" $order) }}
 {{- end }}
 
+{{- /* Sort the ordered components by the "order" key (ascending) */ -}}
+{{- $ordered = sort $ordered "order" "asc" }}
 
-{{- range sort .Values.deploymentOrder "weight" "asc" }}
-{{- include "mimir.component" . | indent 0 }}
+{{- /* Render the ordered components by invoking their partials */ -}}
+{{- range $ordered }}
+  {{- $compName := .name }}
+  {{- /* Call the named template "mimir.<component>" */ -}}
+  {{- include (print "mimir." $compName) . | nindent 0 }}
 {{- end }}
 
-
-# Step 1: Get sorted deploymentOrder list from values.yaml
-{{- $sortedComponents := sort .Values.deploymentOrder "weight" "asc" }}
-
-# Step 2: Render only the components defined in values.yaml (in order)
-{{- range $sortedComponents }}
-{{- include "mimir.component" . | indent 0 }}
-{{- end }}
-
-# Step 3: Get list of all component folders dynamically
-{{- $definedComponents := (pluck "name" .Values.deploymentOrder) | compact }}
-{{- range .Files.Glob "templates/*" }}
-  {{- $folderName := base . }}
-  {{- if not (has $folderName $definedComponents) }}
-    {{- include "mimir.component" (dict "name" $folderName) | indent 0 }}
+{{- /* Now render any remaining components (not defined in deploymentOrder) */ -}}
+{{- $orderedNames := keys .Values.deploymentOrder }}
+{{- range $name, $comp := .Values.components }}
+  {{- if not (has $name $orderedNames) }}
+    {{- include (print "mimir." $name) . | nindent 0 }}
   {{- end }}
 {{- end }}
-
-# Step 1: Deploy only components listed in values.yaml (in order)
-{{- range $key, $value := .Values.deploymentOrder | byKey }}
-{{- include "mimir.component" (dict "name" $key) | indent 0 }}
-{{- end }}
-
-# Step 2: Deploy remaining components (unordered)
-{{- $definedComponents := keys .Values.deploymentOrder }}
-{{- range .Files.Glob "templates/*" }}
-  {{- $folderName := base . }}
-  {{- if not (has $folderName $definedComponents) }}
-    {{- include "mimir.component" (dict "name" $folderName) | indent 0 }}
-  {{- end }}
-{{- end }}
-
 
