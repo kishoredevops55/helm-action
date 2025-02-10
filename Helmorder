@@ -1,0 +1,43 @@
+deploymentOrder:
+  - name: distributor
+    weight: 1
+  - name: ingester
+    weight: 2
+  - name: compactor
+    weight: 3
+  - name: store-gateway
+    weight: 4
+  - name: query-frontend
+    weight: 5
+  - name: querier
+    weight: 6
+  - name: ruler
+    weight: 7
+  - name: alertmanager
+    weight: 8
+
+{{- define "mimir.component" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .name }}
+    spec:
+      containers:
+        - name: {{ .name }}
+          image: grafana/mimir:latest
+---
+{{- end }}
+
+
+{{- range sort .Values.deploymentOrder "weight" "asc" }}
+{{- include "mimir.component" . | indent 0 }}
+{{- end }}
