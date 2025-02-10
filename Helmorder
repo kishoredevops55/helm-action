@@ -1,29 +1,39 @@
-# values.yaml
-orderedFolders:
-  - distributor
-  - ingester
-  - compactor
-  - querier
+helpers
 
+{{/* templates/_helpers.tpl */}}
 
-{{- /*
-  Define a named template that renders all YAML files in a given folder.
-  The folder is expected to be inside the "manifests" directory.
-  It uses Files.Glob to retrieve the files and tpl to render them as templates.
-*/ -}}
-{{- define "mimir.renderFolder" -}}
-  {{- $folder := .folder -}}
-  {{- $files := .Files.Glob (print "manifests/" $folder "/*.yaml") | sort }}
-  {{- range $f := $files }}
-{{ tpl $f.String $. | nindent 2 }}
-  {{- end }}
+{{/* Render alertmanager templates */}}
+{{- define "mimir.alertmanager" -}}
+{{- $files := sort (glob "templates/alertmanager/*.yaml") -}}
+{{- range $files }}
+{{ . | nindent 0 }}
+---
+{{- end }}
 {{- end }}
 
-{{- /*
-  Loop over the list provided in .Values.orderedFolders.
-  For each folder name, call the defined template "mimir.renderFolder".
-*/ -}}
-{{- range .Values.orderedFolders }}
-  {{- $folderName := . }}
-  {{- include "mimir.renderFolder" (dict "folder" $folderName "Values" $.Values) | nindent 0 }}
+{{/* Render distributor templates */}}
+{{- define "mimir.distributor" -}}
+{{- $files := sort (glob "templates/distributor/*.yaml") -}}
+{{- range $files }}
+{{ . | nindent 0 }}
+---
 {{- end }}
+{{- end }}
+
+{{/* Add similar blocks for ingester, querier, etc. as needed */}}
+
+
+
+{{/* templates/parent-template.yaml */}}
+
+{{/* Render alertmanager first */}}
+{{- include "mimir.alertmanager" . }}
+
+{{/* Render distributor next */}}
+{{- include "mimir.distributor" . }}
+
+{{/* Render ingester next */}}
+{{- include "mimir.ingester" . }}
+
+{{/* Render querier next */}}
+{{- include "mimir.querier" . }}
