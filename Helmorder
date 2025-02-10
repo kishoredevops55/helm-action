@@ -59,3 +59,19 @@ spec:
     {{- include "mimir.component" (dict "name" $folderName) | indent 0 }}
   {{- end }}
 {{- end }}
+
+# Step 1: Deploy only components listed in values.yaml (in order)
+{{- range $key, $value := .Values.deploymentOrder | byKey }}
+{{- include "mimir.component" (dict "name" $key) | indent 0 }}
+{{- end }}
+
+# Step 2: Deploy remaining components (unordered)
+{{- $definedComponents := keys .Values.deploymentOrder }}
+{{- range .Files.Glob "templates/*" }}
+  {{- $folderName := base . }}
+  {{- if not (has $folderName $definedComponents) }}
+    {{- include "mimir.component" (dict "name" $folderName) | indent 0 }}
+  {{- end }}
+{{- end }}
+
+
