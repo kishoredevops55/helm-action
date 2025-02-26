@@ -1,60 +1,75 @@
-{{/* Common Labels - Enforce Mandatory Labels */}}
+{{/* Common Labels - Validate Only Where Used */}}
 {{- define "loki.labels" -}}
 
 {{- $mandatoryLabels := .Values.mandatoryLabels | default list }}
-{{- $userDefinedLabels := merge (dict) .Values.anchors.labels }}
+{{- $userDefinedLabels := .Values.anchors.labels | default dict }}
 
-{{/* Ensure Mandatory Labels Exist */}}
-{{- range $mandatoryLabels }}
-  {{- if not (hasKey $userDefinedLabels .) }}
-    {{- fail (printf "❌ Missing mandatory label: %s" .) }}
+{{- $labels := dict }}
+
+{{/* Validate Mandatory Labels, but only in used templates */}}
+{{- if (include "loki.isLabelsUsed" .) }}
+  {{- range $mandatoryLabels }}
+    {{- if not (hasKey $userDefinedLabels .) }}
+      {{- fail (printf "❌ Missing mandatory label: %s" .) }}
+    {{- end }}
   {{- end }}
 {{- end }}
 
-helm.sh/chart: {{ include "loki.chart" . }}
-
-app.kubernetes.io/name: {{ .Chart.Name | toString }}
-
-app.kubernetes.io/instance: {{ .Release.Name }}
+{{/* Add Fixed Labels */}}
+{{- $_ := set $labels "helm.sh/chart" (include "loki.chart" .) }}
+{{- $_ := set $labels "app.kubernetes.io/name" .Chart.Name }}
+{{- $_ := set $labels "app.kubernetes.io/instance" .Release.Name }}
 
 {{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+  {{- $_ := set $labels "app.kubernetes.io/version" (.Chart.AppVersion | quote) }}
 {{- end }}
 
-app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- $_ := set $labels "app.kubernetes.io/managed-by" .Release.Service }}
 
-{{/* Add User-Defined Labels (only from anchors.labels) */}}
+{{/* Add User-Defined Labels */}}
 {{- range $key, $value := $userDefinedLabels }}
-{{ $key }}: {{ $value | quote }}
+  {{- $_ := set $labels $key ($value | quote) }}
+{{- end }}
+
+{{/* Render Labels (No Extra Lines) */}}
+labels:
+{{- range $key, $value := $labels }}
+  {{ $key }}: {{ $value }}
 {{- end }}
 
 {{- end }}
 
 
-{{/* Selector Labels */}}
+{{/* Check If Labels Are Used in This Template */}}
+{{- define "loki.isLabelsUsed" -}}
+  {{- $usedTemplates := list "deployment.yaml" "service.yaml" "statefulset.yaml" }}
+  {{- if has .Template.Name $usedTemplates }}
+    true
+  {{- else }}
+    false
+  {{- end }}
+{{- end }}
+
+
+{{/* Check If Labels Are Used in This Template */}}
+{{- define "loki.isLabelsUsed" -}}
+  {{- $usedTemplates := list "deployment.yaml" "service.yaml" "statefulset.yaml" }}
+  {{- if has .Template.Name $usedTemplates }}
+    true
+  {{- else }}
+    false
+  {{- end }}
+{{- end }}
+
+{{/* Selector Labels - No Extra Lines */}}
 {{- define "loki.selectorLabels" -}}
 
-app.kubernetes.io/name: {{ .Chart.Name | toString }}
-
+app.kubernetes.io/name: {{ .Chart.Name }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{- range $key, $value := .Values.anchors.labels }}
-{{ $key }}: {{ $value | quote }}
+  {{ $key }}: {{ $value | quote }}
 {{- end }}
 
 {{- end }}
-
-mandatoryLabels:
-  - app
-  - appname
-  - portfolio
-  - dr_category
-
-anchors:
-  labels:
-    app: my-app
-    appname: loki-service
-    portfolio: logging
-    dr_category: tier-1
-    environment: production
 
