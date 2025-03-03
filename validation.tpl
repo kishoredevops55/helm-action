@@ -1,180 +1,60 @@
-{{/*
-Validate containers for readinessProbe, livenessProbe, and resource requests/limits.
-1. Checks all containers for:
-   a. Mandatory `readinessProbe`.
-   b. Mandatory `livenessProbe`.
-   c. Mandatory `resources.requests` and `resources.limits`.
-2. Fails during Helm rendering if validation fails.
+{{- define "validate.containers" -}}
+  {{- /* Configurable parameters (could move to values.yaml) */ -}}
+  {{- $allowedKinds := list "Deployment" "DaemonSet" "StatefulSet" -}}
+  {{- $requiredContainerChecks := list "livenessProbe" "readinessProbe" "resources" -}}
+  {{- $requiredInitContainerChecks := list "resources" -}} {{- /* Init containers often don't need probes */ -}}
+  {{- $requireResourceLimits := true -}}
 
-Parameters:
-- $containers: an array of containers to validate.
-- $kind: the resource kind (e.g., StatefulSet, Deployment) for error messages.
-- $resourceName: the name of the resource being validated.
+  {{- range $name, $workload := .Values -}}
+    {{- if and (kindIs "map" $workload) (hasKey $workload "kind") (hasKey $workload "metadata") -}}
+      {{- $workloadKind := get $workload "kind" -}}
+      {{- $metadata := get $workload "metadata" | default dict -}}
+      {{- $workloadName := get $metadata "name" | default (printf "unnamed-%s" $name) -}}
 
-Usage:
-{{ include "common.validateContainers" list .spec.template.spec.containers "StatefulSet" .metadata.name }}
-*/}}
-{{- define "common.validateContainers" -}}
-{{- $containers := index . 0 -}}
-{{- $kind := index . 1 | default "unknown-kind" -}}
-{{- $resourceName := index . 2 | default "unknown-resource" -}}
+      {{- if has $workloadKind $allowedKinds -}}
+        {{- $specPath := get (get $workload "spec" | default dict) "template" | default dict -}}
+        {{- $podSpec := get $specPath "spec" | default dict -}}
+        {{- $containers := get $podSpec "containers" | default list -}}
+        {{- $initContainers := get $podSpec "initContainers" | default list -}}
 
-{{- range $index, $container := $containers -}}
+        {{- /* ✅ Corrected Container existence check */ -}}
+        {{- if and (eq (len $containers) 0) (eq (len $initContainers) 0) -}}
+          {{- fail (printf "%s %s: Must have at least one container or initContainer" $workloadKind $workloadName) -}}
+        {{- end -}}
 
-  {{- if not $container.readinessProbe }}
-    {{- fail (printf "%s '%s': Container '%s' is missing a readinessProbe." $kind $resourceName $container.name) }}
+        {{- /* Container validation */ -}}
+        {{- range $containerType, $containers := dict "container" $containers "initContainer" $initContainers -}}
+          {{- range $container := $containers -}}
+            {{- $containerName := .name | default (printf "unnamed-%s" $containerType) -}}
+            
+            {{- /* Type-specific checks */ -}}
+            {{- $checks := ternary $requiredContainerChecks $requiredInitContainerChecks (eq $containerType "container") -}}
+            {{- range $check := $checks -}}
+              {{- if not (hasKey . $check) -}}
+                {{- fail (printf "%s %s: %s '%s' missing required '%s'" $workloadKind $workloadName $containerType $containerName $check) -}}
+              {{- end -}}
+            {{- end -}}
+
+            {{- /* ✅ Enhanced resource validation */ -}}
+            {{- if hasKey . "resources" -}}
+              {{- $resources := .resources -}}
+              {{- if not (hasKey $resources "requests") -}}
+                {{- fail (printf "%s %s: %s '%s' missing resource requests" $workloadKind $workloadName $containerType $containerName) -}}
+              {{- end -}}
+              {{- if and $requireResourceLimits (not (hasKey $resources "limits")) -}}
+                {{- fail (printf "%s %s: %s '%s' missing resource limits" $workloadKind $workloadName $containerType $containerName) -}}
+              {{- end -}}
+            {{- else -}}
+              {{- fail (printf "%s %s: %s '%s' is missing a 'resources' section" $workloadKind $workloadName $containerType $containerName) -}}
+            {{- end -}}
+
+            {{- /* Security context warning */ -}}
+            {{- if not (hasKey . "securityContext") -}}
+              {{- warn (printf "%s %s: %s '%s' missing securityContext" $workloadKind $workloadName $containerType $containerName) -}}
+            {{- end -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
   {{- end -}}
-
-  {{- if not $container.livenessProbe }}
-    {{- fail (printf "%s '%s': Container '%s' is missing a livenessProbe." $kind $resourceName $container.name) }}
-  {{- end -}}
-
-  {{- if or (not $container.resources.requests) (not $container.resources.limits) }}
-    {{- fail (printf "%s '%s': Container '%s' is missing resource requests/limits (both required)." $kind $resourceName $container.name) }}
-  {{- end -}}
-
 {{- end -}}
-{{- end -}}
-
-{{/*
-Validate init containers (using the same logic as standard containers).
-This function is a wrapper for `common.validateContainers` and is modular so that you can validate init containers separately.
-*/}}
-{{- define "common.validateInitContainers" -}}
-{{ include "common.validateContainers" . }}
-  {{- end -}}
-
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: {{ .Release.Name }}-statefulset
-spec:
-  replicas: {{ .Values.replicaCount }}
-  selector:
-    matchLabels:
-      app: {{ .Values.app }}
-  template:
-    metadata:
-      labels:
-        app: {{ .Values.app }}
-    spec:
-      containers:
-        - name: {{ .Values.container.name }}
-          image: {{ .Values.container.image }}
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 8080
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8080
-          resources:
-            limits:
-              cpu: "500m"
-              memory: "128Mi"
-            requests:
-              cpu: "250m"
-              memory: "64Mi"
-
-      initContainers:
-        - name: {{ .Values.initContainer.name }}
-          image: {{ .Values.initContainer.image }}
-          readinessProbe:
-            httpGet:
-              path: /init-ready
-              port: 8080
-          livenessProbe:
-            httpGet:
-              path: /init-healthz
-              port: 8080
-          resources:
-            limits:
-              cpu: "300m"
-              memory: "64Mi"
-            requests:
-              cpu: "200m"
-              memory: "32Mi"
-
-# Add validation logic here for both containers and initContainers
-{{- if .Values.validation.enabled }}
-{{ include "common.validateContainers" list .spec.template.spec.containers "StatefulSet" .metadata.name }}
-{{ include "common.validateInitContainers" list .spec.template.spec.initContainers "StatefulSet" .metadata.name }}
-{{- end }
-
-
-
- apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ .Release.Name }}-deployment
-spec:
-  replicas: {{ .Values.replicaCount }}
-  selector:
-    matchLabels:
-      app: {{ .Values.app }}
-  template:
-    metadata:
-      labels:
-        app: {{ .Values.app }}
-    spec:
-      containers:
-        - name: {{ .Values.container.name }}
-          image: {{ .Values.container.image }}
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 8080
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8080
-          resources:
-            limits:
-              cpu: "500m"
-              memory: "128Mi"
-            requests:
-              cpu: "250m"
-              memory: "64Mi"
-
-      initContainers:
-        - name: {{ .Values.initContainer.name }}
-          image: {{ .Values.initContainer.image }}
-          readinessProbe:
-            httpGet:
-              path: /init-ready
-              port: 8080
-          livenessProbe:
-            httpGet:
-              path: /init-healthz
-              port: 8080
-          resources:
-            limits:
-              cpu: "300m"
-              memory: "64Mi"
-            requests:
-              cpu: "200m"
-              memory: "32Mi"
-
-# Add validation logic here for both containers and initContainers
-{{- if .Values.validation.enabled }}
-{{ include "common.validateContainers" list .spec.template.spec.containers "Deployment" .metadata.name }}
-{{ include "common.validateInitContainers" list .spec.template.spec.initContainers "Deployment" .metadata.name }}
-{{- end }}
-
-
-  # Enable or disable container validation
-validation:
-  enabled: true
-
-# Sample StatefulSet and Deployment configuration
-replicaCount: 3
-app: my-app
-
-container:
-  name: app-container
-  image: nginx:1.19
-
-initContainer:
-  name: init-container
-  image: nginx:1.19
