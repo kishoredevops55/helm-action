@@ -1,59 +1,39 @@
 {{- define "validate.containers" -}}
-  {{- /* Configurable parameters (could move to values.yaml) */ -}}
-  {{- $allowedKinds := list "Deployment" "DaemonSet" "StatefulSet" -}}
-  {{- $requiredContainerChecks := list "livenessProbe" "readinessProbe" "resources" -}}
-  {{- $requiredInitContainerChecks := list "resources" -}} {{- /* Init containers often don't need probes */ -}}
-  {{- $requireResourceLimits := true -}}
+  {{- $allowedKinds := list "Deployment" "StatefulSet" "DaemonSet" -}}
 
-  {{- range $name, $workload := .Values -}}
-    {{- if and (kindIs "map" $workload) (hasKey $workload "kind") (hasKey $workload "metadata") -}}
-      {{- $workloadKind := get $workload "kind" -}}
-      {{- $metadata := get $workload "metadata" | default dict -}}
-      {{- $workloadName := get $metadata "name" | default (printf "unnamed-%s" $name) -}}
+  {{- range $kind := $allowedKinds -}}
+    {{- range $workload := (lookup "apps/v1" $kind .Release.Namespace "").items | default list -}}
+      {{- $workloadName := get $workload.metadata "name" -}}
+      {{- $podSpec := get $workload.spec.template.spec "containers" | default list -}}
+      {{- $initContainers := get $workload.spec.template.spec "initContainers" | default list -}}
 
-      {{- if has $workloadKind $allowedKinds -}}
-        {{- $specPath := get (get $workload "spec" | default dict) "template" | default dict -}}
-        {{- $podSpec := get $specPath "spec" | default dict -}}
-        {{- $containers := get $podSpec "containers" | default list -}}
-        {{- $initContainers := get $podSpec "initContainers" | default list -}}
+      {{- if or (eq (len $podSpec) 0) (eq (len $initContainers) 0) -}}
+        {{- fail (printf "%s %s: Must have at least one container or initContainer" $kind $workloadName) -}}
+      {{- end -}}
 
-        {{- /* ✅ Corrected Container existence check */ -}}
-        {{- if and (eq (len $containers) 0) (eq (len $initContainers) 0) -}}
-          {{- fail (printf "%s %s: Must have at least one container or initContainer" $workloadKind $workloadName) -}}
+      {{- range concat $podSpec $initContainers -}}
+        {{- $containerName := .name | default "unnamed-container" -}}
+
+        {{- if not (hasKey . "livenessProbe") -}}
+          {{- fail (printf "%s %s: Container '%s' is missing 'livenessProbe'" $kind $workloadName $containerName) -}}
         {{- end -}}
 
-        {{- /* Container validation */ -}}
-        {{- range $containerType, $containers := dict "container" $containers "initContainer" $initContainers -}}
-          {{- range $container := $containers -}}
-            {{- $containerName := .name | default (printf "unnamed-%s" $containerType) -}}
-            
-            {{- /* Type-specific checks */ -}}
-            {{- $checks := ternary $requiredContainerChecks $requiredInitContainerChecks (eq $containerType "container") -}}
-            {{- range $check := $checks -}}
-              {{- if not (hasKey . $check) -}}
-                {{- fail (printf "%s %s: %s '%s' missing required '%s'" $workloadKind $workloadName $containerType $containerName $check) -}}
-              {{- end -}}
-            {{- end -}}
+        {{- if not (hasKey . "readinessProbe") -}}
+          {{- fail (printf "%s %s: Container '%s' is missing 'readinessProbe'" $kind $workloadName $containerName) -}}
+        {{- end -}}
 
-            {{- /* ✅ Enhanced resource validation */ -}}
-            {{- if hasKey . "resources" -}}
-              {{- $resources := .resources -}}
-              {{- if not (hasKey $resources "requests") -}}
-                {{- fail (printf "%s %s: %s '%s' missing resource requests" $workloadKind $workloadName $containerType $containerName) -}}
-              {{- end -}}
-              {{- if and $requireResourceLimits (not (hasKey $resources "limits")) -}}
-                {{- fail (printf "%s %s: %s '%s' missing resource limits" $workloadKind $workloadName $containerType $containerName) -}}
-              {{- end -}}
-            {{- else -}}
-              {{- fail (printf "%s %s: %s '%s' is missing a 'resources' section" $workloadKind $workloadName $containerType $containerName) -}}
-            {{- end -}}
-
-            {{- /* Security context warning */ -}}
-            {{- if not (hasKey . "securityContext") -}}
-              {{- warn (printf "%s %s: %s '%s' missing securityContext" $workloadKind $workloadName $containerType $containerName) -}}
-            {{- end -}}
+        {{- if not (hasKey . "resources") -}}
+          {{- fail (printf "%s %s: Container '%s' is missing 'resources' section" $kind $workloadName $containerName) -}}
+        {{- else -}}
+          {{- $resources := .resources -}}
+          {{- if not (hasKey $resources "requests") -}}
+            {{- fail (printf "%s %s: Container '%s' is missing 'resources.requests'" $kind $workloadName $containerName) -}}
+          {{- end -}}
+          {{- if not (hasKey $resources "limits") -}}
+            {{- fail (printf "%s %s: Container '%s' is missing 'resources.limits'" $kind $workloadName $containerName) -}}
           {{- end -}}
         {{- end -}}
+
       {{- end -}}
     {{- end -}}
   {{- end -}}
