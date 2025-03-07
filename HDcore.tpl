@@ -3,11 +3,14 @@
 
   {{- range $key, $workload := .Values }}
     {{- if and (kindIs "map" $workload) (hasKey $workload "kind") -}}
-      {{- $workloadKind := get $workload "kind" }}
-      {{- $workloadName := get (get $workload "metadata") "name" | default $key }}
+      {{- $workloadKind := get $workload "kind" | default "" }}
+      {{- $metadata := get $workload "metadata" | default dict }}
+      {{- $workloadName := get $metadata "name" | default $key }}  {{/* Prevent nil pointer errors */}}
 
       {{- if has $workloadKind $allowedKinds -}}
-        {{- $podSpec := get (get $workload "spec") "template" | default dict | get "spec" | default dict }}
+        {{- $spec := get $workload "spec" | default dict }}
+        {{- $template := get $spec "template" | default dict }}
+        {{- $podSpec := get $template "spec" | default dict }}
         {{- $containers := get $podSpec "containers" | default list }}
 
         {{- if eq (len $containers) 0 }}
