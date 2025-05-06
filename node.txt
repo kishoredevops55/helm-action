@@ -1,0 +1,43 @@
+#!/bin/bash
+
+contexts=("aks-prod-context" "gke-prod-context" "kind")
+namespaces=("a" "b" "c")
+report_file="cluster_report.txt"
+
+echo "Generating Kubernetes Cluster Report..." > $report_file
+date >> $report_file
+echo "==========================================" >> $report_file
+
+for ctx in "${contexts[@]}"; do
+  echo -e "\n\n### Cluster: $ctx\n" >> $report_file
+  kubectl config use-context $ctx &>/dev/null
+
+  echo ">>> Node Memory Utilization" >> $report_file
+  kubectl top nodes >> $report_file 2>/dev/null || echo "metrics-server not installed" >> $report_file
+
+  echo -e "\n>>> Node Allocated Resources" >> $report_file
+  kubectl describe nodes | grep -A10 "Allocated resources" >> $report_file
+
+  echo -e "\n>>> Node IP Ranges (podCIDR)" >> $report_file
+  kubectl get nodes -o jsonpath="{range .items[*]}{.metadata.name}{'\t'}{.spec.podCIDR}{'\n'}{end}" >> $report_file
+
+  echo -e "\n>>> Pods per Node" >> $report_file
+  kubectl get pods --all-namespaces -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' \
+  | sort | uniq -c >> $report_file
+
+  echo -e "\n>>> Node Pool Summary (Auto-scaling Inference)" >> $report_file
+  kubectl get nodes -L cloud.google.com/gke-nodepool,kubernetes.azure.com/agentpool,nodepool \
+  >> $report_file
+
+  echo -e "\n>>> Horizontal Pod Autoscalers (HPA)" >> $report_file
+  kubectl get hpa -A >> $report_file
+
+  echo -e "\n>>> Namespaces A, B, C Workload Summary" >> $report_file
+  for ns in "${namespaces[@]}"; do
+    echo -e "\nNamespace: $ns" >> $report_file
+    kubectl get all -n "$ns" >> $report_file
+    kubectl top pods -n "$ns" >> $report_file 2>/dev/null || echo "metrics-server not installed" >> $report_file
+  done
+done
+
+echo -e "\nReport generation completed: $report_file"
