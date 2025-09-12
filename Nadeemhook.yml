@@ -1,1 +1,141 @@
+rules:
+  # ----------------
+  # Helm Chart Rules
+  # ----------------
+  - id: "helm-no-latest-tag"
+    description: "Images must not use 'latest' tag"
+    severity: "error"
+    regex:
+      pattern: "image:.*:latest"
+    suggestion: "Pin images to a specific version (e.g., nginx:1.25.2)"
 
+  - id: "helm-prod-env-safety"
+    description: "Ensure prod values.yaml does not reference dev/perf"
+    severity: "error"
+    regex:
+      pattern: "(dev|perf)"
+      deny_if_in_path: "prod"
+    suggestion: "Use dedicated prod configs only."
+
+  - id: "helm-required-labels"
+    description: "All Kubernetes objects must have standard Helm labels"
+    severity: "error"
+    required_fields:
+      - "metadata.labels.app.kubernetes.io/name"
+      - "metadata.labels.app.kubernetes.io/version"
+    suggestion: "Add Helm recommended labels to every manifest."
+
+  # ----------------
+  # kube-score rules
+  # ----------------
+  - id: "kubescore-probes"
+    description: "Containers should have readiness & liveness probes"
+    severity: "warning"
+    required_fields:
+      - "spec.template.spec.containers[].readinessProbe"
+      - "spec.template.spec.containers[].livenessProbe"
+    suggestion: "Define probes under container spec."
+
+  - id: "kubescore-resource-limits"
+    description: "Containers should have CPU and memory requests/limits"
+    severity: "error"
+    required_fields:
+      - "spec.template.spec.containers[].resources.requests.cpu"
+      - "spec.template.spec.containers[].resources.requests.memory"
+      - "spec.template.spec.containers[].resources.limits.cpu"
+      - "spec.template.spec.containers[].resources.limits.memory"
+    suggestion: "Add requests and limits for both CPU and memory."
+
+  - id: "kubescore-non-root"
+    description: "Containers must not run as root"
+    severity: "error"
+    required_fields:
+      - "spec.template.spec.securityContext.runAsNonRoot"
+    suggestion: "Set runAsNonRoot: true."
+
+  # ----------------
+  # Polaris rules
+  # ----------------
+  - id: "polaris-privileged"
+    description: "Privileged containers are forbidden"
+    severity: "error"
+    deny_fields:
+      - "spec.template.spec.containers[].securityContext.privileged"
+    suggestion: "Remove privileged: true."
+
+  - id: "polaris-host-path"
+    description: "Avoid hostPath volumes for security reasons"
+    severity: "error"
+    deny_fields:
+      - "spec.template.spec.volumes[].hostPath"
+    suggestion: "Use PVC or emptyDir instead of hostPath."
+
+  - id: "polaris-image-pull-policy"
+    description: "ImagePullPolicy should be IfNotPresent or Never in prod"
+    severity: "warning"
+    conditional_rule:
+      path: "spec.template.spec.containers[].imagePullPolicy"
+      deny_if: "Always"
+      allow_if_env: "dev"
+    suggestion: "Use IfNotPresent in production."
+
+  # ----------------
+  # Datree rules
+  # ----------------
+  - id: "datree-service-type"
+    description: "LoadBalancer services not allowed in non-prod"
+    severity: "error"
+    conditional_rule:
+      path: "spec.type"
+      deny_if: "LoadBalancer"
+      allow_if_env: "prod"
+    suggestion: "Use ClusterIP in dev/staging."
+
+  - id: "datree-pdb-required"
+    description: "Production workloads must define PodDisruptionBudget"
+    severity: "warning"
+    required_if_env:
+      env: "prod"
+      fields:
+        - "spec.minAvailable"
+        - "spec.maxUnavailable"
+    suggestion: "Define a PDB in prod."
+
+  - id: "datree-ingress-tls"
+    description: "Ingress must use TLS in prod"
+    severity: "error"
+    required_if_env:
+      env: "prod"
+      fields:
+        - "spec.tls"
+    suggestion: "Add TLS block in Ingress."
+
+  # ----------------
+  # CIS Benchmark & Security Rules
+  # ----------------
+  - id: "cis-capabilities-drop"
+    description: "Containers should drop all Linux capabilities unless required"
+    severity: "error"
+    required_fields:
+      - "spec.template.spec.containers[].securityContext.capabilities.drop"
+    suggestion: "Add `capabilities.drop: [ALL]`."
+
+  - id: "cis-readonly-fs"
+    description: "Containers should use readOnlyRootFilesystem"
+    severity: "warning"
+    required_fields:
+      - "spec.template.spec.containers[].securityContext.readOnlyRootFilesystem"
+    suggestion: "Set readOnlyRootFilesystem: true."
+
+  - id: "cis-network-policy"
+    description: "Every namespace must have a NetworkPolicy"
+    severity: "error"
+    required_fields:
+      - "kind: NetworkPolicy"
+    suggestion: "Add restrictive NetworkPolicy per namespace."
+
+  # ----------------
+  # Cloud-Native Extras (more than 100 total)
+  # ----------------
+  # (These will include checks for RBAC, HPAs, CRDs, Secrets, ConfigMaps, PVCs, etc.)
+  
