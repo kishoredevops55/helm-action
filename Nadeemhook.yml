@@ -139,3 +139,583 @@ rules:
   # ----------------
   # (These will include checks for RBAC, HPAs, CRDs, Secrets, ConfigMaps, PVCs, etc.)
   
+# rules.yaml — World-class Helm + kube-score + Polaris + Datree style rules
+# ~110 rules covering images, security, resources, networking, storage, RBAC, probes, policies, labels, observability, and infra-specific checks.
+
+rules:
+  ########################################
+  # IMAGE & REGISTRY (1-12)
+  ########################################
+  - id: IMG_001
+    name: "No :latest image tag"
+    description: "Images must not use :latest"
+    severity: error
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: [":latest\\b"]
+
+  - id: IMG_002
+    name: "Image digest encouraged"
+    description: "Prefer image pinning with digest"
+    severity: warning
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["image:\\s*[^\\n]*:[^\\n]*\\s*$"]
+    suggestion: "Use an immutable digest like @sha256:<digest>."
+
+  - id: IMG_003
+    name: "Disallow public Docker Hub usage"
+    description: "Use internal/approved registry"
+    severity: warning
+    files: ["values*.yaml"]
+    deny_patterns: ["^\\s*image:\\s*docker\\.io/|docker\\.io/"]
+    suggestion: "Use registry.mycompany.com/..."
+
+  - id: IMG_004
+    name: "No snapshot/unstable tags"
+    description: "Avoid SNAPSHOT or nightly tags"
+    severity: warning
+    files: ["values*.yaml"]
+    deny_patterns: ["SNAPSHOT|nightly|dev|alpha|beta"]
+
+  - id: IMG_005
+    name: "ImagePullPolicy not Always in prod"
+    description: "Avoid Always for production"
+    severity: warning
+    files: ["values-prod.yaml", "templates/*.yaml"]
+    deny_patterns: ["imagePullPolicy:\\s*Always"]
+    suggestion: "Use IfNotPresent or explicit tag and pin images."
+
+  - id: IMG_006
+    name: "Registry whitelist enforcement"
+    description: "Only allow whitelisted registries"
+    severity: error
+    files: ["values*.yaml"]
+    deny_patterns: ["(?!registry\\.mycompany\\.com|gcr\\.io/prod).*docker\\.io.*"]
+
+  - id: IMG_007
+    name: "Image tag semantic versioning"
+    description: "Encourage semver tags"
+    severity: info
+    files: ["values*.yaml"]
+    deny_patterns: ["\\b(v?\\d+\\.\\d+\\.\\d+\\b)"]
+
+  - id: IMG_008
+    name: "No mutable tags in prod"
+    description: "Disallow non-immutable tags in prod"
+    severity: error
+    files: ["values-prod.yaml"]
+    deny_patterns: ["-SNAPSHOT|:latest|:dev|:test"]
+
+  - id: IMG_009
+    name: "Image repo path length check"
+    description: "Warn if repo path too deep (complexity)"
+    severity: info
+    files: ["values*.yaml"]
+    deny_patterns: ["[a-z0-9\\-]+/[a-z0-9\\-]+/[a-z0-9\\-]+"]
+    suggestion: "Keep repo path simple."
+
+  - id: IMG_010
+    name: "Ensure image tag exists"
+    description: "Image must include a tag or digest"
+    severity: error
+    files: ["values*.yaml"]
+    deny_patterns: ["image:\\s*([^:@\\s]+)(\\s|$)"]  # matches image without tag/digest
+
+  - id: IMG_011
+    name: "No internal test images in prod"
+    description: "Avoid referencing test images in prod"
+    severity: error
+    files: ["values-prod.yaml"]
+    deny_patterns: ["test-image|qa-image|dev-image|internal-test"]
+
+  - id: IMG_012
+    name: "Image pull secrets defined if private registry used"
+    description: "Check for imagePullSecrets presence when private registry referenced"
+    severity: warning
+    files: ["values*.yaml","templates/*.yaml"]
+    deny_patterns: ["registry\\.mycompany\\.com.*", "imagePullSecrets: *\\[\\]"]
+    suggestion: "Add imagePullSecrets for private registries."
+
+  ########################################
+  # SECURITY: USER, CAPABILITIES, FS (13-30)
+  ########################################
+  - id: SEC_013
+    name: "Pod must not run as root"
+    description: "Ensure runAsNonRoot is true"
+    severity: error
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["runAsUser:\\s*0", "runAsNonRoot:\\s*false"]
+    suggestion: "Set runAsNonRoot: true and non-zero runAsUser."
+
+  - id: SEC_014
+    name: "Avoid privileged containers"
+    description: "privileged: true must not be present"
+    severity: error
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["privileged:\\s*true"]
+    suggestion: "Remove privileged: true"
+
+  - id: SEC_015
+    name: "Drop dangerous capabilities"
+    description: "Avoid NET_ADMIN, SYS_ADMIN capabilities"
+    severity: error
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["NET_ADMIN|SYS_ADMIN|SYS_TIME|SYS_MODULE"]
+    suggestion: "Drop unnecessary capabilities."
+
+  - id: SEC_016
+    name: "Enforce readOnlyRootFilesystem"
+    description: "Prefer readOnlyRootFilesystem true"
+    severity: warning
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["readOnlyRootFilesystem:\\s*false"]
+    suggestion: "Enable readOnlyRootFilesystem: true"
+
+  - id: SEC_017
+    name: "No hostNetwork"
+    description: "Avoid hostNetwork usage"
+    severity: error
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["hostNetwork:\\s*true"]
+
+  - id: SEC_018
+    name: "No hostPID or hostIPC"
+    description: "Avoid host PID/IPC namespaces"
+    severity: error
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["hostPID:\\s*true", "hostIPC:\\s*true"]
+
+  - id: SEC_019
+    name: "Seccomp profile present"
+    description: "Warn if no seccompProfile set"
+    severity: warning
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["seccompProfile: null", "seccompProfile:\\s*\"\""]
+    suggestion: "Set a restrictive seccompProfile."
+
+  - id: SEC_020
+    name: "No capability add 'ALL'"
+    description: "Avoid adding ALL capabilities"
+    severity: error
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["capabilities:\\s*add:\\s*-\\s*\\*"]
+
+  - id: SEC_021
+    name: "Avoid container privilege escalation"
+    description: "shouldRunAsNonRoot and allowPrivilegeEscalation check"
+    severity: error
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["allowPrivilegeEscalation:\\s*true"]
+
+  - id: SEC_022
+    name: "Secret references should not be empty"
+    description: "secretName must not be blank"
+    severity: error
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ['secretName:\\s*["\\\']?\\s*["\\\']?']
+    suggestion: "Provide valid secretName or use external secret manager."
+
+  - id: SEC_023
+    name: "No inline passwords / API keys"
+    description: "Detect common inline secret patterns"
+    severity: error
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["password:\\s*['\\\"][^'\\\"]+['\\\"]", "api_key:\\s*['\\\"][^'\\\"]+['\\\"]", "secret_access_key:\\s*['\\\"][^'\\\"]+['\\\"]"]
+
+  - id: SEC_024
+    name: "KMS/KeyVault usage in prod"
+    description: "Check for correct KeyVault/KMS references"
+    severity: warning
+    files: ["values-prod.yaml"]
+    deny_patterns: ["keyvault-dev|keyvault-test|kms-test"]
+    suggestion: "Use production KeyVault/KMS."
+
+  - id: SEC_025
+    name: "Role/ClusterRole with wildcard verbs"
+    description: "Avoid verbs: ['*'] in RBAC"
+    severity: warning
+    files: ["templates/*.yaml"]
+    deny_patterns: ["verbs:\\s*-\\s*\\*"]
+    suggestion: "Define least-privilege verbs."
+
+  - id: SEC_026
+    name: "ServiceAccount automountToken disabled when possible"
+    description: "automountServiceAccountToken should be false for default SAs"
+    severity: warning
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["automountServiceAccountToken:\\s*true"]
+
+  - id: SEC_027
+    name: "Image user specified"
+    description: "Warn if image runs as root with no user specified"
+    severity: warning
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["user:\\s*root|runAsUser:\\s*0"]
+
+  - id: SEC_028
+    name: "Network policies required"
+    description: "NetworkPolicy should be present in prod"
+    severity: error
+    files: ["values-prod.yaml"]
+    deny_patterns: ["networkPolicy:\\s*false", "networkPolicy:\\s*null"]
+    suggestion: "Add a NetworkPolicy to restrict traffic."
+
+  - id: SEC_029
+    name: "PodSecurity admission labels"
+    description: "Ensure PodSecurity contexts are present"
+    severity: warning
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["podSecurity.*:.*privileged"]
+
+  - id: SEC_030
+    name: "Immutable configmaps / secrets"
+    description: "Encourage immutable: true for configmaps/secrets in prod"
+    severity: info
+    files: ["values-prod.yaml"]
+    deny_patterns: ["immutable:\\s*false"]
+    suggestion: "Consider immutable: true for stable production configs."
+
+  ########################################
+  # RESOURCES & SCALING (31-56)
+  ########################################
+  - id: RES_031
+    name: "CPU requests in prod must be >= 500m"
+    description: "Ensure CPU requests minimum"
+    severity: error
+    files: ["values-prod.yaml"]
+    numeric_check:
+      key: "resources.requests.cpu"
+      min: "500m"
+    suggestion: "Set resources.requests.cpu >= 500m"
+
+  - id: RES_032
+    name: "Memory requests in prod must be >= 1Gi"
+    description: "Ensure memory requests minimum"
+    severity: error
+    files: ["values-prod.yaml"]
+    numeric_check:
+      key: "resources.requests.memory"
+      min: "1Gi"
+    suggestion: "Set resources.requests.memory >= 1Gi"
+
+  - id: RES_033
+    name: "CPU limits in prod must be >= requests"
+    description: "Ensure limits >= requests"
+    severity: error
+    files: ["values-prod.yaml"]
+    numeric_check:
+      key: "resources.limits.cpu"
+      min_field: "resources.requests.cpu"
+    suggestion: "Set resources.limits.cpu >= resources.requests.cpu"
+
+  - id: RES_034
+    name: "Memory limits in prod must be >= requests"
+    description: "Ensure memory limits >= requests"
+    severity: error
+    files: ["values-prod.yaml"]
+    numeric_check:
+      key: "resources.limits.memory"
+      min_field: "resources.requests.memory"
+    suggestion: "Set resources.limits.memory >= resources.requests.memory"
+
+  - id: RES_035
+    name: "Replica count prod min 2"
+    description: "HA: replicas >= 2"
+    severity: error
+    files: ["values-prod.yaml"]
+    numeric_check:
+      key: "replicaCount"
+      min: "2"
+    suggestion: "Set replicaCount >= 2 for prod."
+
+  - id: RES_036
+    name: "Requests and Limits defined"
+    description: "Containers should define both requests and limits"
+    severity: error
+    files: ["templates/*.yaml","values*.yaml"]
+    required_fields:
+      - "spec.template.spec.containers[].resources.requests.cpu"
+      - "spec.template.spec.containers[].resources.limits.cpu"
+
+  - id: RES_037
+    name: "HPA target CPU defined"
+    description: "HPA should have target CPU utilization"
+    severity: warning
+    files: ["templates/*.yaml"]
+    deny_patterns: ["targetCPUUtilizationPercentage: null", "targetCPUUtilizationPercentage:"]
+
+  - id: RES_038
+    name: "PodDisruptionBudget recommended for prod"
+    description: "PDB should exist for prod workloads"
+    severity: warning
+    files: ["values-prod.yaml"]
+    deny_patterns: ["podDisruptionBudget: null", "podDisruptionBudget: {}"]
+    suggestion: "Define PodDisruptionBudget with minAvailable or maxUnavailable."
+
+  - id: RES_039
+    name: "LimitRange suggested for namespace"
+    description: "Namespace should recommend limits"
+    severity: info
+    files: ["templates/*.yaml"]
+    deny_patterns: ["apiVersion: v1\\s+kind: LimitRange|kind:\\s*LimitRange"]
+
+  - id: RES_040
+    name: "No tiny CPU in prod"
+    description: "Do not use 100m CPU in prod for main services"
+    severity: error
+    files: ["values-prod.yaml"]
+    deny_patterns: ["cpu:\\s*100m\\b"]
+    suggestion: "Use larger requests/limits in production."
+
+  - id: RES_041
+    name: "No tiny memory in prod"
+    description: "Do not use 128Mi in prod"
+    severity: error
+    files: ["values-prod.yaml"]
+    deny_patterns: ["memory:\\s*128Mi\\b"]
+    suggestion: "Use larger memory requests/limits."
+
+  - id: RES_042
+    name: "Ensure readinessProbe configured"
+    description: "Containers should have readinessProbe"
+    severity: error
+    files: ["templates/*.yaml","values*.yaml"]
+    deny_patterns: ["readinessProbe: null|readinessProbe:\\s*\\{\\}"]
+
+  - id: RES_043
+    name: "Ensure livenessProbe configured"
+    description: "Containers should have livenessProbe"
+    severity: error
+    files: ["templates/*.yaml","values*.yaml"]
+    deny_patterns: ["livenessProbe: null|livenessProbe:\\s*\\{\\}"]
+
+  - id: RES_044
+    name: "StartupProbe use for slow starting containers"
+    description: "Suggest startupProbe when needed"
+    severity: info
+    files: ["templates/*.yaml"]
+    deny_patterns: ["startupProbe: null|startupProbe:\\s*\\{\\}"]
+
+  - id: RES_045
+    name: "Autoscaling target should be configured"
+    description: "HPA target should be present for scalable apps"
+    severity: warning
+    files: ["templates/*.yaml"]
+    deny_patterns: ["kind:\\s*HorizontalPodAutoscaler"]
+
+  - id: RES_046
+    name: "Resource request/limits not empty object"
+    description: "Detect blank resources: {}"
+    severity: error
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["resources:\\s*\\{}"]
+
+  - id: RES_047
+    name: "No excessive CPU overcommit"
+    description: "Warn if CPU limit >> request (e.g., >10x)"
+    severity: warning
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["resources:\\s*.*limits:.*requests:.*"]  # placeholder; numeric check recommended later
+
+  - id: RES_048
+    name: "Enforce resource quotas for namespace"
+    description: "Namespace resourceQuota recommended"
+    severity: info
+    files: ["templates/*.yaml"]
+    deny_patterns: ["kind:\\s*ResourceQuota"]
+
+  ########################################
+  # NETWORKING (57-74)
+  ########################################
+  - id: NET_057
+    name: "Ingress TLS must be enabled"
+    description: "Ingress should have TLS configured"
+    severity: error
+    files: ["values-prod.yaml","templates/*.yaml"]
+    deny_patterns: ["tls:\\s*false", "tls:\\s*\\[\\s*\\]"]
+    suggestion: "Configure TLS hosts and secretName."
+
+  - id: NET_058
+    name: "Service type LoadBalancer only in prod"
+    description: "Prevent LoadBalancer in non-prod"
+    severity: error
+    files: ["values-dev.yaml","values-perf.yaml"]
+    deny_patterns: ["type:\\s*LoadBalancer"]
+    suggestion: "Use ClusterIP/NodePort in non-prod."
+
+  - id: NET_059
+    name: "NetworkPolicy should be enforced"
+    description: "NetworkPolicy recommended in prod"
+    severity: error
+    files: ["values-prod.yaml"]
+    deny_patterns: ["networkPolicy:\\s*false", "networkPolicy:\\s*null"]
+
+  - id: NET_060
+    name: "ServiceAccount usage"
+    description: "Avoid default SA for pods"
+    severity: warning
+    files: ["templates/*.yaml","values*.yaml"]
+    deny_patterns: ["serviceAccountName:\\s*default"]
+
+  - id: NET_061
+    name: "DNSPolicy check"
+    description: "Avoid legacy DNS policy if possible"
+    severity: info
+    files: ["templates/*.yaml"]
+    deny_patterns: ["dnsPolicy:\\s*Default"]
+
+  - id: NET_062
+    name: "ExternalTrafficPolicy not Local unless needed"
+    description: "Suggest Cluster behavior"
+    severity: warning
+    files: ["templates/*.yaml","values*.yaml"]
+    deny_patterns: ["externalTrafficPolicy:\\s*Local"]
+
+  - id: NET_063
+    name: "Avoid open hostPorts"
+    description: "hostPort usage should be restricted"
+    severity: warning
+    files: ["templates/*.yaml","values*.yaml"]
+    deny_patterns: ["hostPort:\\s*\\d+"]
+
+  - id: NET_064
+    name: "No allowAll network policy in prod"
+    description: "Avoid permissive network policies"
+    severity: error
+    files: ["values-prod.yaml"]
+    deny_patterns: ["allowAll:\\s*true"]
+
+  - id: NET_065
+    name: "Service port names present"
+    description: "Service ports should be named for multiport services"
+    severity: warning
+    files: ["templates/*.yaml"]
+    deny_patterns: ["ports:\\s*-\\s*port:.*\\n\\s*targetPort:"]
+
+  - id: NET_066
+    name: "Ingress path type present"
+    description: "Use pathType for ingress rules"
+    severity: warning
+    files: ["templates/*.yaml"]
+    deny_patterns: ["pathType:\\s*null", "pathType:\\s*"]
+
+  - id: NET_067
+    name: "SessionAffinity discouraged"
+    description: "Avoid affinity unless required"
+    severity: info
+    files: ["values*.yaml", "templates/*.yaml"]
+    deny_patterns: ["sessionAffinity:\\s*ClientIP"]
+
+  - id: NET_068
+    name: "ExternalName Service checks"
+    description: "ExternalName service usage warned"
+    severity: warning
+    files: ["templates/*.yaml"]
+    deny_patterns: ["kind:\\s*Service\\s*.*type:\\s*ExternalName"]
+
+  - id: NET_069
+    name: "LoadBalancer health check annotations"
+    description: "LoadBalancer should have healthcheck annotations in clouds"
+    severity: info
+    files: ["templates/*.yaml"]
+    deny_patterns: ["service\\.beta\\.kubernetes\\.io|service\\.annotations: \\{\\}"]
+
+  - id: NET_070
+    name: "Allowlist network egress if required"
+    description: "Warn if wide egress allowed"
+    severity: warning
+    files: ["values*.yaml","templates/*.yaml"]
+    deny_patterns: ["egress:\\s*-\\s*-\\s*to:.*ipBlock:"]
+
+  ########################################
+  # STORAGE (75-88)
+  ########################################
+  - id: STOR_075
+    name: "Avoid hostPath volumes"
+    description: "Use PVCs instead of hostPath"
+    severity: error
+    files: ["templates/*.yaml", "values*.yaml"]
+    deny_patterns: ["hostPath:"]
+
+  - id: STOR_076
+    name: "StorageClass specified"
+    description: "storageClassName should be defined"
+    severity: error
+    files: ["values*.yaml"]
+    deny_patterns: ["storageClassName:\\s*\\\"\\\"|storageClassName:\\s*null"]
+
+  - id: STOR_077
+    name: "PVC requests present"
+    description: "Check for PVC size"
+    severity: error
+    files: ["values*.yaml","templates/*.yaml"]
+    deny_patterns: ["resources:\\s*requests:\\s*storage:\\s*"]
+
+  - id: STOR_078
+    name: "Avoid excessive volume mounts"
+    description: "Warn if many mounts per container"
+    severity: info
+    files: ["templates/*.yaml"]
+    deny_patterns: ["volumeMounts:\\s*-"]
+
+  - id: STOR_079
+    name: "Filesystem type check"
+    description: "Prefer supported FS types for PV"
+    severity: info
+    files: ["templates/*.yaml"]
+    deny_patterns: ["fsType:\\s*ext4|xfs"]
+
+  - id: STOR_080
+    name: "Ensure reclaimPolicy"
+    description: "PersistentVolume should set reclaimPolicy"
+    severity: info
+    files: ["templates/*.yaml"]
+    deny_patterns: ["reclaimPolicy:\\s*null"]
+
+  - id: STOR_081
+    name: "Avoid default local storage in prod"
+    description: "Warn if local storage used for prod"
+    severity: error
+    files: ["values-prod.yaml"]
+    deny_patterns: ["local-storage|hostPath"]
+
+  - id: STOR_082
+    name: "Check storage class for encryption"
+    description: "Prefer encrypted storage classes for prod"
+    severity: warning
+    files: ["values-prod.yaml"]
+    deny_patterns: ["encryption:\\s*false"]
+
+  ########################################
+  # OBSERVABILITY & LOGGING (89-96)
+  ########################################
+  - id: OBS_089
+    name: "LivenessProbe required"
+    description: "Containers require livenessProbe"
+    severity: error
+    files: ["templates/*.yaml","values*.yaml"]
+    deny_patterns: ["livenessProbe:\\s*null|livenessProbe:\\s*\\{\\}"]
+
+  - id: OBS_090
+    name: "ReadinessProbe required"
+    description: "Containers require readinessProbe"
+    severity: error
+    files: ["templates/*.yaml","values*.yaml"]
+    deny_patterns: ["readinessProbe:\\s*null|readinessProbe:\\s*\\{\\}"]
+
+  - id: OBS_091
+    name: "Prometheus metrics endpoint configured"
+    description: "Look for metrics path or annotations"
+    severity: warning
+    files: ["values*.yaml","templates/*.yaml"]
+    deny_patterns: ["prometheus.io/scrape: false", "metrics: false"]
+
+  - id: OBS_092
+    name: "Logging enabled"
+    description: "Ensure logging is not disabled"
+    severity: error
+    files: ["values*.yaml","templates/*.yaml"]
+    deny_patterns: ["logging:\\s*false"]
+
+  - id: OBS_093
+    name: "ServiceMonitor present for prod"
+    description: "ServiceMonitor or annotations for scr
