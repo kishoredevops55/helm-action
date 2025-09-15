@@ -1,0 +1,57 @@
+rules:
+  - id: R001
+    description: "Prod values must not contain nonprod references"
+    type: regex
+    severity: critical
+    match: "nonprod|perf|dev"
+    condition: must_not_exist
+    suggestion: "Remove non-production references from prod Helm values"
+
+  - id: R002
+    description: "AKS must be referenced as 'aks', not gke or other cloud names"
+    type: regex
+    severity: critical
+    match: "gke|gcp|google|eks|aws"
+    condition: must_not_exist
+    suggestion: "Use 'aks' for Azure Kubernetes Service references in prod"
+
+  - id: R010
+    description: "Image tag must not use 'latest'"
+    type: regex
+    severity: high
+    match: "image:.*:latest"
+    condition: must_not_exist
+    suggestion: "Pin images to a specific version for reliability"
+
+  - id: R025
+    description: "Resource limits must be defined"
+    type: key_exists
+    severity: high
+    match: "resources.limits"
+    condition: must_exist
+    suggestion: "Define resource limits for CPU and memory"
+
+  - id: R050
+    description: "Secrets must not be hardcoded in values.yaml"
+    type: regex
+    severity: critical
+    match: "(password|secret|apikey|token):"
+    condition: must_not_exist
+    suggestion: "Use Kubernetes Secrets or Key Vault integration instead"
+
+  - id: R075
+    description: "Ingress hostnames must not contain wildcard *"
+    type: regex
+    severity: high
+    match: "host:.*\\*"
+    condition: must_not_exist
+    suggestion: "Use explicit hostnames instead of wildcards"
+
+  - id: R100
+    description: "All charts must specify maintainers"
+    type: key_exists
+    severity: medium
+    match: "maintainers"
+    condition: must_exist
+    suggestion: "Add a maintainers field in Chart.yaml for ownership"
+    
