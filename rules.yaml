@@ -1,0 +1,244 @@
+ignore_files:
+  - values-temp.yaml
+  - charts/test-chart/
+  - ignore-this.yaml
+
+ignore_charts:
+  - test-chart
+  - legacy-chart
+
+ignore_variables:
+  - debugMode
+  - temporaryFlag
+  - testAnnotation
+
+rules:
+  # ENVIRONMENT RULES
+  - id: ENV_PROD
+    enabled: true
+    description: "Production files must not contain non-production references"
+    severity: critical
+    category: environment
+    env_match: ["prod"]
+    patterns: ["\\bdev\\b", "\\bqa\\b", "\\bstage\\b", "\\btest\\b", "\\bnonprod\\b", "\\bperf\\b", "\\bperf1\\b"]
+    suggestion: "Remove {value} references from prod values."
+    action: "Replace {value} with proper prod values."
+
+  - id: ENV_DEV
+    enabled: true
+    description: "Dev files must not contain production references"
+    severity: high
+    category: environment
+    env_match: ["dev"]
+    patterns: ["\\bprod\\b", "\\bproduction\\b"]
+    suggestion: "Remove {value} references from dev values."
+    action: "Move {value} config to prod-specific files."
+
+  - id: ENV_STAGE
+    enabled: true
+    description: "Stage files must not contain production references"
+    severity: high
+    category: environment
+    env_match: ["stage"]
+    patterns: ["\\bprod\\b", "\\bproduction\\b"]
+    suggestion: "Remove {value} references from stage values."
+    action: "Move {value} config to prod-specific files."
+
+  - id: ENV_QA
+    enabled: true
+    description: "QA files must not contain production references"
+    severity: high
+    category: environment
+    env_match: ["qa"]
+    patterns: ["\\bprod\\b", "\\bproduction\\b"]
+    suggestion: "Remove {value} references from QA values."
+    action: "Move {value} config to prod-specific files."
+
+  - id: ENV_NONPROD
+    enabled: true
+    description: "Nonprod files must not contain production references"
+    severity: high
+    category: environment
+    env_match: ["nonprod"]
+    patterns: ["\\bprod\\b", "\\bproduction\\b"]
+    suggestion: "Remove {value} references from nonprod values."
+    action: "Move {value} config to prod-specific files."
+
+  - id: ENV_PERF
+    enabled: true
+    description: "Perf files must not contain production references"
+    severity: high
+    category: environment
+    env_match: ["perf"]
+    patterns: ["\\bprod\\b", "\\bproduction\\b"]
+    suggestion: "Remove {value} references from perf values."
+    action: "Move {value} config to prod-specific files."
+
+  - id: ENV_PERF1
+    enabled: true
+    description: "Perf1 files must not contain production references"
+    severity: high
+    category: environment
+    env_match: ["perf1"]
+    patterns: ["\\bprod\\b", "\\bproduction\\b"]
+    suggestion: "Remove {value} references from perf1 values."
+    action: "Move {value} config to prod-specific files."
+
+  # CLOUD RULES
+  - id: CLOUD_AKS
+    enabled: true
+    description: "AKS files must not contain GKE or AWS references"
+    severity: critical
+    category: cloud
+    env_match: ["aks"]
+    patterns: ["\\bgke\\b", "\\bgcp\\b", "\\bgoogle\\b", "\\baws\\b", "\\beks\\b"]
+    suggestion: "Remove {value} references from AKS configuration."
+    action: "Split {value} config into GKE/AWS-specific files."
+
+  - id: CLOUD_GKE
+    enabled: true
+    description: "GKE files must not contain AKS or AWS references"
+    severity: critical
+    category: cloud
+    env_match: ["gke", "gcp"]
+    patterns: ["\\baks\\b", "\\bazure\\b", "\\baws\\b", "\\beks\\b"]
+    suggestion: "Remove {value} references from GKE configuration."
+    action: "Split {value} config into AKS/AWS-specific files."
+
+  - id: CLOUD_AWS
+    enabled: true
+    description: "AWS files must not contain AKS or GKE references"
+    severity: critical
+    category: cloud
+    env_match: ["aws", "eks"]
+    patterns: ["\\baks\\b", "\\bazure\\b", "\\bgke\\b", "\\bgcp\\b"]
+    suggestion: "Remove {value} references from AWS configuration."
+    action: "Split {value} config into AKS/GKE-specific files."
+
+  # REGION RULES
+  - id: REGION_EAST
+    enabled: true
+    description: "East region files must not contain west region references"
+    severity: high
+    category: region
+    env_match: ["east", "eastus", "eu", "uw4"]
+    patterns: ["\\bwest\\b", "\\bwu\\b", "\\buw2\\b", "\\bwestus\\b"]
+    suggestion: "Remove {value} references from east region configuration."
+    action: "Move {value} config to west-specific files."
+
+  - id: REGION_WEST
+    enabled: true
+    description: "West region files must not contain east region references"
+    severity: high
+    category: region
+    env_match: ["west", "westus", "wu", "uw2"]
+    patterns: ["\\beast\\b", "\\beu\\b", "\\buw4\\b", "\\beastus\\b"]
+    suggestion: "Remove {value} references from west region configuration."
+    action: "Move {value} config to east-specific files."
+
+  # IMAGE TAG RULES
+  - id: IMAGE_TAG_NESTED
+    enabled: true
+    description: "Only approved image tags are allowed (nested tag)"
+    severity: critical
+    category: image
+    env_match: ["all"]
+    patterns:
+      - "tag:\\s*(?!prod-v|v.*-RELEASE|v.*-SNAPSHOT)[^\\s]+"
+    suggestion: "Use approved image tags like prod-v.*, v.*-RELEASE, or v.*-SNAPSHOT."
+    action: "Update image tag to match approved formats."
+
+  # RESOURCE RULES
+  - id: RES_CPU_PROD
+    enabled: true
+    description: "Production CPU must be at least 500m"
+    severity: critical
+    category: resource
+    env_match: ["prod"]
+    patterns: ["cpu:\\s*(?![5-9][0-9]{2,}m|[1-9][0-9]*000m)\\d+m"]
+    suggestion: "Use CPU >= 500m for production workloads."
+    action: "Update CPU request to meet production standards."
+
+  - id: RES_MEM_PROD
+    enabled: true
+    description: "Production memory must be at least 512Mi"
+    severity: critical
+    category: resource
+    env_match: ["prod"]
+    patterns: ["memory:\\s*(?![5-9][1-9]{2,}Mi|[1-9][0-9]{3,}Mi)\\d+Mi"]
+    suggestion: "Use memory >= 512Mi for production workloads."
+    action: "Update memory request to meet production standards."
+
+  # REPLICA RULES
+  - id: REPLICA_DEV
+    enabled: true
+    description: "Dev should not exceed 2 replicas"
+    severity: medium
+    category: scaling
+    env_match: ["dev"]
+    patterns: ["replicaCount:\\s*(?:[3-9]|[1-9][0-9]{2,})"]
+    suggestion: "Use replicaCount <= 2 for dev."
+    action: "Reduce replica count to save resources."
+
+  - id: REPLICA_PROD
+    enabled: true
+    description: "Production must have at least 2 replicas"
+    severity: critical
+    category: scaling
+    env_match: ["prod"]
+    patterns: ["replicaCount:\\s*[01]"]
+    suggestion: "Use replicaCount >= 2 for production."
+    action: "Increase replica count for high availability."
+
+  # KUBERNETES POLICIES
+  - id: K8S_API_VERSION
+    enabled: true
+    description: "Deprecated Kubernetes API versions must not be used"
+    severity: critical
+    category: kubernetes
+    env_match: ["all"]
+    patterns: ["apiVersion:\\s*extensions/v1beta1", "apiVersion:\\s*apps/v1beta1"]
+    suggestion: "Use stable API versions like apps/v1."
+    action: "Update apiVersion to supported Kubernetes versions."
+
+  - id: K8S_NODEPOOL_LABEL
+    enabled: true
+    description: "Node pool labels must be set for scheduling"
+    severity: high
+    category: kubernetes
+    env_match: ["all"]
+    patterns: ["nodeSelector:\\s*\\{\\s*\\}"]
+    suggestion: "Define nodeSelector labels for workload placement."
+    action: "Set nodeSelector to target appropriate node pool."
+
+  # METADATA RULES
+  - id: METADATA_DR_CATEGORY
+    enabled: true
+    description: "drCategory must be set to dr3"
+    severity: critical
+    category: metadata
+    env_match: ["all"]
+    patterns: ["drCategory:\\s*(?!dr3)[^\\s]+"]
+    suggestion: "Set drCategory to dr3."
+    action: "Update drCategory to dr3 for compliance."
+
+  - id: METADATA_COST_CENTER
+    enabled: true
+    description: "costCenter must be set to 9901623"
+    severity: critical
+    category: metadata
+    env_match: ["all"]
+    patterns: ["costCenter:\\s*(?!9901623)[^\\s]+"]
+    suggestion: "Set costCenter to 9901623."
+    action: "Update costCenter to match approved value."
+
+  - id: METADATA_PORTFOLIO
+    enabled: true
+    description: "portfolio must be Observability only"
+    severity: high
+    category: metadata
+    env_match: ["all"]
+    patterns: ["portfolio:\\s*(?!Observability)[^\\s]+"]
+    suggestion: "Set portfolio to Observability or Devops."
+    action: "Remove invalid portfolio value and use approved options."
+  
