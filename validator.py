@@ -37,6 +37,9 @@ def scan_file(filepath, rules, rules_file_path, ignore_variables):
         return violations
 
     for line_no, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue  # Skip empty or commented lines
         if any(var in line for var in ignore_variables):
             continue
         for rule in rules:
@@ -54,7 +57,7 @@ def scan_file(filepath, rules, rules_file_path, ignore_variables):
                         "path": filepath,
                         "line": line_no,
                         "forbidden": matched_value,
-                        "description": rule.get("description", ""),
+                        "description": rule.get("description", "").replace("{value}", matched_value),
                         "suggestion": rule.get("suggestion", "").replace("{value}", matched_value),
                         "action": rule.get("action", "").replace("{value}", matched_value)
                     })
