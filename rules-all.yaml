@@ -1,16 +1,24 @@
 ignore_files:
-  - values-temp.yaml
-  - charts/test-chart/
-  - ignore-this.yaml
+  # Ignore everything by default
+  - "*"
+  # Allow only these folders and their contents
+  - "!helm/**"
+  - "!helmchart/**"
+  - "!helmchart*/**"
 
 ignore_charts:
-  - test-chart
-  - legacy-chart
+  # Ignore all charts except those in allowed folders
+  - "*"
+  - "!helm"
+  - "!helmchart"
+  - "!helmchart*"
 
 ignore_variables:
+  # Variables to skip during validation
   - debugMode
   - temporaryFlag
   - testAnnotation
+
 
 rules:
   # ENVIRONMENT RULES
@@ -300,9 +308,10 @@ rules:
     category: metadata
     env_match: ["all"]
     patterns:
-      - "drCategory:\\s*(?!dr3)[^\\s]+"
-    suggestion: "Set drCategory to dr3."
-    action: "Update drCategory to dr3 for compliance."
+      - "drCategory:\\s*(?!dr3\\b|\\*?drCategory\\b|&?drCategory\\b)[^\\s]+"
+    suggestion: "Set drCategory to dr3 or use approved anchor."
+    action: "Update drCategory to dr3 for compliance or reference."
+
 
   - id: METADATA_COST_CENTER
     enabled: true
@@ -311,9 +320,10 @@ rules:
     category: metadata
     env_match: ["all"]
     patterns:
-      - "costCenter:\\s*(?!9901623)[^\\s]+"
-    suggestion: "Set costCenter to 9901623."
-    action: "Update costCenter to match approved value."
+      - "costCenter:\\s*(?!9901623\\b|\\*?costCenter\\b|&?costCenter\\b)[^\\s]+"
+    suggestion: "Set costCenter to 9901623 or use approved anchor."
+    action: "Update costCenter to match approved value or reference."
+
 
   - id: METADATA_PORTFOLIO
     enabled: true
@@ -322,6 +332,7 @@ rules:
     category: metadata
     env_match: ["all"]
     patterns:
-      - "portfolio:\\s*(?!Observability|Devops)[^\\s]+"
-    suggestion: "Set portfolio to Observability or Devops."
-    action: "Remove invalid portfolio value and use approved options."
+      - "portfolio:\\s*(?!Observability\\*?portfolio\\b|&?portfolio\\b)[^\\s]+"
+    suggestion: "Set portfolio to Observability or Devops, or use approved anchor."
+    action: "Remove invalid portfolio value and use approved options or reference."
+
