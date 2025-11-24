@@ -1,0 +1,2 @@
+{{- $content := .Files.Get "input.yaml" -}}
+{{ tpl $content . }}
