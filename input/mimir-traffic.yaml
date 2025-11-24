@@ -29,5 +29,8 @@ manifest: |
 {{- printf "%s" .Values.manifest }}
 {{- end }}
 
+{{ .Values.manifest }}
+
+
 
 
