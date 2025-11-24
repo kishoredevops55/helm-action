@@ -7,4 +7,9 @@
 {{ printf "%s" $file }}
 {{- end }}
 
+{{- range $path, $file := .Files.Glob "manifests/*.yaml" }}
+{{ printf "%s" $file }}
+{{- end }}
+
+
 
