@@ -1,2 +1,5 @@
 {{- $content := .Files.Get "input.yaml" -}}
 {{ tpl $content . }}
+
+{{ tpl (.Files.Get .Values.manifestFile) . }}
+
