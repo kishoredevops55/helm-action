@@ -33,6 +33,9 @@ manifest: |
 
 manifestFile: manifests/per-100.yaml
 
+{{ .Files.Get .Values.manifestFile }}
+
+
 
 
 
