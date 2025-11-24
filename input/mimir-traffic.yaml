@@ -11,5 +11,15 @@
 {{ printf "%s" $file }}
 {{- end }}
 
+{{- /*
+  Print .Values.manifest EXACTLY as-is.
+  No toYaml, no extra keys, no reformatting.
+*/ -}}
+{{- if .Values.manifest }}
+{{- printf "%s" .Values.manifest }}
+{{- end }}
+
+manifest: |
+
 
 
