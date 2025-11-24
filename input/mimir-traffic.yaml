@@ -3,3 +3,8 @@
 
 {{ tpl (.Files.Get .Values.manifestFile) . }}
 
+{{- range $path, $file := .Files.Glob "manifests/*.yaml" }}
+{{ printf "%s" $file }}
+{{- end }}
+
+
