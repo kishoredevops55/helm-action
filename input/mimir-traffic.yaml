@@ -37,6 +37,19 @@ manifestFile: manifests/per-100.yaml
 
 
 
+{{- /*
+Loads an external file by path from .Values.manifestFile and prints it.
+*/ -}}
+{{- $path := .Values.manifestFile | default "" -}}
+{{- if and $path (has $path .Files.Glob $path) -}}
+{{- printf "%s\n" (.Files.Get $path) -}}
+{{- else -}}
+# No manifest file found. Expected at: {{ $path }}
+{{- end -}}
+
+
+
+
 
 
 
