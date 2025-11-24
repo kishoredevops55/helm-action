@@ -21,5 +21,13 @@
 
 manifest: |
 
+{{- /*
+  Print .Values.manifest EXACTLY as-is.
+  If .Values.manifest is empty or missing, output will be empty.
+*/ -}}
+{{- if .Values.manifest }}
+{{- printf "%s" .Values.manifest }}
+{{- end }}
+
 
 
