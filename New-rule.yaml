@@ -1,0 +1,21 @@
+- id: forbidden_clouds_in_aks
+  enabled: true
+  type: regex
+  severity: critical
+
+  description: "AKS values must not contain GKE/GCP/Google/EKS/AWS/OCI references (with controlled exceptions)"
+
+  match: '(?i)\bgke\b(?!\s*:\s*(false)?\s*$)|\b(gcp|google|eks|aws|oci|oracle)\b(?!.*config\.river\.aks)'
+
+  file_pattern:
+    - 'aks.*values\.yaml'
+    - 'aks.*configmap\.yaml'
+
+  condition: must_not_exist
+
+  suggestion: "Remove forbidden cloud reference from AKS values files"
+
+  ignore_keys: []
+  ignore_values: []
+  ignore_files: []
+  
