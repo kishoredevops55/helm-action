@@ -1,0 +1,15 @@
+- id: value_key_must_not_contain_prod_in_nonprod
+  enabled: true
+  type: regex
+  severity: critical
+  description: "Nonprod values must not reference prod endpoints"
+
+  match: '(?is)-\s*name\s*:\s*.*\n\s*value\s*:\s*.*prod'
+
+  file_pattern:
+    - '.*[\\/](nonprod|perf|qa|stage|dev)[\\/].*\.ya?ml$'
+    - '(^|.*[\\/])values\.ya?ml$'
+
+  condition: must_not_exist
+  message: "CRITICAL: Nonprod values file contains prod reference"
+  suggestion: "Replace prod endpoint with nonprod equivalent"
