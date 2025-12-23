@@ -1,0 +1,44 @@
+- id: nonprod_tolerations_must_not_use_pr
+  enabled: true
+  type: regex
+  severity: critical
+
+  description: "Nonprod tolerations must not reference prod nodepools (pr)"
+
+  # engine matches VALUE token only
+  match: '(?i)\besco.*pr.*\b'
+
+  file_pattern:
+    - '.*[\\/](nonprod|dev|perf|qa|stage)[\\/].*values\.ya?ml$'
+
+  condition: must_not_exist
+
+  message: "CRITICAL: Nonprod toleration uses prod nodepool (pr)"
+  suggestion: "Use nonprod nodepool naming like esco*np*"
+
+  ignore_keys: []
+  ignore_values: []
+  ignore_files: []
+
+
+  - id: prod_tolerations_must_not_use_np
+  enabled: true
+  type: regex
+  severity: critical
+
+  description: "Prod tolerations must not reference nonprod nodepools (np)"
+
+  match: '(?i)\besco.*np.*\b'
+
+  file_pattern:
+    - '.*[\\/](prod)[\\/].*values\.ya?ml$'
+
+  condition: must_not_exist
+
+  message: "CRITICAL: Prod toleration uses nonprod nodepool (np)"
+  suggestion: "Use prod nodepool naming like esco*pr*"
+
+  ignore_keys: []
+  ignore_values: []
+  ignore_files: []
+  
